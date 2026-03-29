@@ -1,0 +1,68 @@
+name: diet_app
+description: Personalized Diet Chat App
+
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # ── Icons ──────────────────────────────────────────────
+  cupertino_icons: ^1.0.9
+
+  # ── State Management ───────────────────────────────────
+  provider: ^6.1.5
+
+  # ── Navigation ─────────────────────────────────────────
+  go_router: ^17.1.0
+
+  # ── Authentication (Login Screen) ──────────────────────
+  firebase_core: ^4.6.0
+  firebase_auth: ^6.3.0
+  google_sign_in: ^7.2.0
+  flutter_facebook_auth: ^7.1.6
+
+  # ── Backend / API ──────────────────────────────────────
+  http: ^1.6.0
+  dio: ^5.9.2
+
+  # ── Local Storage ──────────────────────────────────────
+  shared_preferences: ^2.5.5
+  flutter_secure_storage: ^10.0.0
+
+  # ── UI Components (Dashboard) ──────────────────────────
+  fl_chart: ^1.2.0
+  percent_indicator: ^4.2.5
+  cached_network_image: ^3.4.1
+  shimmer: ^3.0.0
+  lottie: ^3.3.2
+
+  # ── Forms & Validation ────────────────────────────────
+  flutter_form_builder: ^10.3.0
+  form_builder_validators: ^11.3.0
+
+  # ── Utilities ─────────────────────────────────────────
+  intl: ^0.20.2
+  image_picker: ^1.2.1
+  connectivity_plus: ^7.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/google.png
+    - assets/images/facebook.png
+    - assets/images/x.png
+    - assets/images/microsoft.png
+    - assets/images/logo.png
