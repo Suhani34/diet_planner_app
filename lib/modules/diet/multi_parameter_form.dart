@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../widgets/app_background.dart';
+import '../../widgets/ruler_scale_picker.dart';
+import '../dashboard/dashboard_screen.dart';
 
 class MultiParameterForm extends StatefulWidget {
   const MultiParameterForm({super.key});
@@ -27,38 +30,64 @@ class _MultiParameterFormState extends State<MultiParameterForm> {
   List<String> allergies = [];
   List<String> medicalConditions = [];
 
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
   Future<void> nextPage() async {
     if (currentPage < 12) {
       await _controller.nextPage(
-        duration: const Duration(milliseconds: 400),
+        duration: const Duration(milliseconds: 350),
         curve: Curves.easeInOut,
       );
+      setState(() {
+        currentPage++;
+      });
     }
   }
 
   void previousPage() {
     if (currentPage > 0) {
       _controller.previousPage(
-        duration: const Duration(milliseconds: 400),
+        duration: const Duration(milliseconds: 350),
         curve: Curves.easeInOut,
       );
+      setState(() {
+        currentPage--;
+      });
+    }
+  }
+
+  Future<void> _handleContinue() async {
+    if (currentPage >= 12) {
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const DashboardScreen(),
+        ),
+      );
+    } else {
+      await nextPage();
     }
   }
 
   Widget buildCard(Widget child) {
     return Center(
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 60),
-        padding: const EdgeInsets.all(25),
+        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 36),
+        padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(25),
+          color: const Color(0xFFFDF8F4),
+          borderRadius: BorderRadius.circular(30),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 25,
-              offset: const Offset(0, 15),
-            )
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 18,
+              offset: const Offset(0, 10),
+            ),
           ],
         ),
         child: child,
@@ -66,137 +95,104 @@ class _MultiParameterFormState extends State<MultiParameterForm> {
     );
   }
 
-  Widget buildGradientBackground(Widget child) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFFFFE0B2), Color(0xFFFFF3E0)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+  Widget buildSectionTitle(String title, {String? subtitle}) {
+    return Column(
+      children: [
+        Text(
+          title,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF272525),
+          ),
         ),
-      ),
-      child: buildCard(child),
+        if (subtitle != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 15,
+              color: Colors.black54,
+            ),
+          ),
+        ],
+      ],
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text("Step ${currentPage + 1} of 13"),
-        backgroundColor: Colors.orange,
+  Widget buildValueChip({
+    required IconData icon,
+    required Color color,
+    required String label,
+    required String value,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      body: Column(
+      child: Row(
         children: [
+          Icon(icon, color: color),
+          const SizedBox(width: 10),
           Expanded(
-            child: PageView(
-              controller: _controller,
-              onPageChanged: (index) {
-                setState(() {
-                  currentPage = index;
-                });
-              },
-              children: [
-                buildGradientBackground(buildAgeSelector()),
-                buildGradientBackground(buildGenderSelection()),
-                buildGradientBackground(buildHeightSelector()),
-                buildGradientBackground(buildWeightSelector()),
-                buildGradientBackground(buildSingleChoice("Select Goal", [
-                  "Lose Weight",
-                  "Gain Weight",
-                  "Maintain Weight"
-                ], (v) => goal = v)),
-                buildGradientBackground(buildSingleChoice("Activity Level", [
-                  "Sedentary",
-                  "Lightly Active",
-                  "Moderately Active",
-                  "Very Active"
-                ], (v) => activityLevel = v)),
-                buildGradientBackground(buildSingleChoice("Diet Preference", [
-                  "Vegetarian",
-                  "Non-Vegetarian",
-                  "Vegan",
-                  "Eggetarian"
-                ], (v) => dietPreference = v)),
-                buildGradientBackground(buildSingleChoice("Daily Meal Frequency",
-                    ["3 Meals", "5 Small Meals", "Intermittent Fasting"],
-                    (v) => mealFrequency = v)),
-                buildGradientBackground(buildSingleChoice(
-                    "Target Timeline",
-                    ["1 Month", "3 Months", "6 Months"],
-                    (v) => timeline = v)),
-                buildGradientBackground(buildSingleChoice(
-                    "Food Budget Level", ["Low", "Medium", "High"],
-                    (v) => budget = v)),
-                buildGradientBackground(buildSingleChoice(
-                    "Cuisine Preference",
-                    ["Indian", "South Indian", "North Indian", "Western"],
-                    (v) => cuisine = v)),
-                buildGradientBackground(buildMultiChoice(
-                    "Allergies",
-                    ["Lactose", "Gluten", "Nuts", "Seafood"],
-                    allergies)),
-                buildGradientBackground(buildMultiChoice(
-                    "Medical Conditions",
-                    ["Diabetes", "Thyroid", "BP", "PCOS"],
-                    medicalConditions)),
-              ],
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 17,
+                color: Color(0xFF2A2929),
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              children: [
-                if (currentPage > 0)
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: previousPage,
-                      child: const Text("Back"),
-                    ),
-                  ),
-                if (currentPage > 0) const SizedBox(width: 10),
-                Expanded(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
-                    onPressed: () async {
-                      await nextPage();
-                    },
-                    child: const Text("Continue"),
-                  ),
-                ),
-              ],
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.bold,
+              color: color,
             ),
-          )
+          ),
         ],
       ),
     );
   }
 
-  // AGE
   Widget buildAgeSelector() {
-    double selectedAge = double.parse(age);
-
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Text("Select Your Age",
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 20),
-        Text("${selectedAge.toInt()} Years",
-            style: const TextStyle(
-                fontSize: 28, fontWeight: FontWeight.bold, color: Colors.orange)),
-        Slider(
-          value: selectedAge,
+        buildSectionTitle(
+          "About You",
+          subtitle: "Select your age using the scale below",
+        ),
+        const SizedBox(height: 26),
+        buildValueChip(
+          icon: Icons.cake_outlined,
+          color: const Color(0xFF7B61FF),
+          label: "Age",
+          value: age,
+        ),
+        const SizedBox(height: 28),
+        RulerScalePicker(
           min: 10,
           max: 80,
-          divisions: 70,
-          activeColor: Colors.orange,
+          initialValue: int.parse(age),
+          majorTickEvery: 5,
+          accentColor: const Color(0xFF7B61FF),
           onChanged: (value) {
             setState(() {
-              age = value.toInt().toString();
+              age = value.toString();
             });
           },
         ),
@@ -204,28 +200,31 @@ class _MultiParameterFormState extends State<MultiParameterForm> {
     );
   }
 
-  // HEIGHT
   Widget buildHeightSelector() {
-    double selectedHeight = double.parse(height);
-
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Text("Select Your Height",
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 20),
-        Text("${selectedHeight.toInt()} cm",
-            style: const TextStyle(
-                fontSize: 28, fontWeight: FontWeight.bold, color: Colors.green)),
-        Slider(
-          value: selectedHeight,
+        buildSectionTitle(
+          "Height",
+          subtitle: "Set your height using the ruler scale",
+        ),
+        const SizedBox(height: 26),
+        buildValueChip(
+          icon: Icons.height_rounded,
+          color: const Color(0xFFFF4FA3),
+          label: "Height",
+          value: "$height cm",
+        ),
+        const SizedBox(height: 28),
+        RulerScalePicker(
           min: 120,
           max: 220,
-          divisions: 100,
-          activeColor: Colors.green,
+          initialValue: int.parse(height),
+          majorTickEvery: 10,
+          accentColor: const Color(0xFFFF4FA3),
           onChanged: (value) {
             setState(() {
-              height = value.toInt().toString();
+              height = value.toString();
             });
           },
         ),
@@ -233,28 +232,31 @@ class _MultiParameterFormState extends State<MultiParameterForm> {
     );
   }
 
-  // WEIGHT
   Widget buildWeightSelector() {
-    double selectedWeight = double.parse(weight);
-
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Text("Select Your Weight",
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 20),
-        Text("${selectedWeight.toInt()} kg",
-            style: const TextStyle(
-                fontSize: 28, fontWeight: FontWeight.bold, color: Colors.blue)),
-        Slider(
-          value: selectedWeight,
+        buildSectionTitle(
+          "Weight",
+          subtitle: "Choose your current weight",
+        ),
+        const SizedBox(height: 26),
+        buildValueChip(
+          icon: Icons.monitor_weight_outlined,
+          color: const Color(0xFF6A5AE0),
+          label: "Weight",
+          value: "$weight kg",
+        ),
+        const SizedBox(height: 28),
+        RulerScalePicker(
           min: 30,
           max: 150,
-          divisions: 120,
-          activeColor: Colors.blue,
+          initialValue: int.parse(weight),
+          majorTickEvery: 10,
+          accentColor: const Color(0xFF6A5AE0),
           onChanged: (value) {
             setState(() {
-              weight = value.toInt().toString();
+              weight = value.toString();
             });
           },
         ),
@@ -262,13 +264,14 @@ class _MultiParameterFormState extends State<MultiParameterForm> {
     );
   }
 
-  // GENDER ICON SELECTOR
   Widget buildGenderSelection() {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Text("Select Gender",
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+        buildSectionTitle(
+          "Gender",
+          subtitle: "Choose the option that fits you best",
+        ),
         const SizedBox(height: 30),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -277,13 +280,13 @@ class _MultiParameterFormState extends State<MultiParameterForm> {
             genderCard("Female", Icons.female, Colors.pink),
             genderCard("Other", Icons.transgender, Colors.purple),
           ],
-        )
+        ),
       ],
     );
   }
 
   Widget genderCard(String value, IconData icon, Color color) {
-    bool isSelected = gender == value;
+    final isSelected = gender == value;
 
     return GestureDetector(
       onTap: () {
@@ -292,47 +295,81 @@ class _MultiParameterFormState extends State<MultiParameterForm> {
         });
       },
       child: Container(
-        padding: const EdgeInsets.all(20),
+        width: 92,
+        padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.2) : Colors.white,
-          borderRadius: BorderRadius.circular(15),
+          color: isSelected ? color.withOpacity(0.16) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(
-              color: isSelected ? color : Colors.grey.shade300, width: 2),
+            color: isSelected ? color : Colors.grey.shade300,
+            width: 2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 6,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Column(
           children: [
-            Icon(icon, size: 40, color: color),
+            Icon(icon, size: 38, color: color),
             const SizedBox(height: 10),
-            Text(value,
-                style:
-                    const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            Text(
+              value,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  // SINGLE CHOICE
   Widget buildSingleChoice(
-      String title, List<String> options, Function(String) onSelected) {
+    String title,
+    List<String> options,
+    Function(String) onSelected,
+  ) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text(title,
-            style:
-                const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+        buildSectionTitle(
+          title,
+          subtitle: "Select one option",
+        ),
         const SizedBox(height: 20),
-        ...options.map((option) => RadioListTile(
-              title: Text(option),
+        ...options.map(
+          (option) => Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: RadioListTile<String>(
+              title: Text(
+                option,
+                style: const TextStyle(fontSize: 16),
+              ),
               value: option,
               groupValue: getGroupValue(title),
-              activeColor: Colors.orange,
+              activeColor: const Color(0xFFF29D72),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
               onChanged: (value) {
+                if (value == null) return;
                 setState(() {
-                  onSelected(value.toString());
+                  onSelected(value);
                 });
               },
-            ))
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -358,31 +395,224 @@ class _MultiParameterFormState extends State<MultiParameterForm> {
     }
   }
 
-  // MULTI CHOICE
   Widget buildMultiChoice(
-      String title, List<String> options, List<String> selectedList) {
+    String title,
+    List<String> options,
+    List<String> selectedList,
+  ) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text(title,
-            style:
-                const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+        buildSectionTitle(
+          title,
+          subtitle: "Select all that apply",
+        ),
         const SizedBox(height: 20),
-        ...options.map((option) => CheckboxListTile(
-              title: Text(option),
+        ...options.map(
+          (option) => Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: CheckboxListTile(
+              title: Text(
+                option,
+                style: const TextStyle(fontSize: 16),
+              ),
               value: selectedList.contains(option),
-              activeColor: Colors.orange,
+              activeColor: const Color(0xFFF29D72),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
               onChanged: (value) {
                 setState(() {
                   if (value == true) {
-                    selectedList.add(option);
+                    if (!selectedList.contains(option)) {
+                      selectedList.add(option);
+                    }
                   } else {
                     selectedList.remove(option);
                   }
                 });
               },
-            ))
+            ),
+          ),
+        ),
       ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: AppBackground(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: Row(
+                children: [
+                  if (currentPage > 0)
+                    IconButton(
+                      onPressed: previousPage,
+                      icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                    ),
+                  const Expanded(
+                    child: Text(
+                      "Complete Your Profile",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 30,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF272525),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 48),
+                ],
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              "Tell us about yourself",
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.black54,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              "Step ${currentPage + 1} of 13",
+              style: const TextStyle(
+                fontSize: 15,
+                color: Colors.black45,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: PageView(
+                controller: _controller,
+                physics: const NeverScrollableScrollPhysics(),
+                children: [
+                  buildCard(buildAgeSelector()),
+                  buildCard(buildGenderSelection()),
+                  buildCard(buildHeightSelector()),
+                  buildCard(buildWeightSelector()),
+                  buildCard(buildSingleChoice(
+                    "Select Goal",
+                    ["Lose Weight", "Gain Weight", "Maintain Weight"],
+                    (v) => goal = v,
+                  )),
+                  buildCard(buildSingleChoice(
+                    "Activity Level",
+                    [
+                      "Sedentary",
+                      "Lightly Active",
+                      "Moderately Active",
+                      "Very Active"
+                    ],
+                    (v) => activityLevel = v,
+                  )),
+                  buildCard(buildSingleChoice(
+                    "Diet Preference",
+                    [
+                      "Vegetarian",
+                      "Non-Vegetarian",
+                      "Vegan",
+                      "Eggetarian"
+                    ],
+                    (v) => dietPreference = v,
+                  )),
+                  buildCard(buildSingleChoice(
+                    "Daily Meal Frequency",
+                    ["3 Meals", "5 Small Meals", "Intermittent Fasting"],
+                    (v) => mealFrequency = v,
+                  )),
+                  buildCard(buildSingleChoice(
+                    "Target Timeline",
+                    ["1 Month", "3 Months", "6 Months"],
+                    (v) => timeline = v,
+                  )),
+                  buildCard(buildSingleChoice(
+                    "Food Budget Level",
+                    ["Low", "Medium", "High"],
+                    (v) => budget = v,
+                  )),
+                  buildCard(buildSingleChoice(
+                    "Cuisine Preference",
+                    ["Indian", "South Indian", "North Indian", "Western"],
+                    (v) => cuisine = v,
+                  )),
+                  buildCard(buildMultiChoice(
+                    "Allergies",
+                    ["Lactose", "Gluten", "Nuts", "Seafood"],
+                    allergies,
+                  )),
+                  buildCard(buildMultiChoice(
+                    "Medical Conditions",
+                    ["Diabetes", "Thyroid", "BP", "PCOS"],
+                    medicalConditions,
+                  )),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  if (currentPage > 0)
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: previousPage,
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(56),
+                          side: const BorderSide(color: Color(0xFFF29D72)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(22),
+                          ),
+                        ),
+                        child: const Text(
+                          "Back",
+                          style: TextStyle(
+                            color: Color(0xFFF29D72),
+                            fontSize: 17,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (currentPage > 0) const SizedBox(width: 12),
+                  Expanded(
+                    child: SizedBox(
+                      height: 56,
+                      child: ElevatedButton(
+                        onPressed: _handleContinue,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFF29D72),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(22),
+                          ),
+                        ),
+                        child: Text(
+                          currentPage >= 12
+                              ? "Save & Continue"
+                              : "Continue",
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
