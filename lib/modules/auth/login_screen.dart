@@ -46,7 +46,9 @@ class _LoginScreenState extends State<LoginScreen> {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => const DashboardScreen(),
+          builder: (_) => DashboardScreen(
+            name: usernameController.text.trim(),
+          ),
         ),
       );
     } else {
@@ -67,10 +69,65 @@ class _LoginScreenState extends State<LoginScreen> {
       suffixIcon: suffixIcon,
       filled: true,
       fillColor: Colors.white,
-      contentPadding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+      contentPadding:
+          const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(18),
         borderSide: BorderSide.none,
+      ),
+    );
+  }
+
+  Widget _buildSocialButton({
+    required String assetPath,
+    required String providerName,
+    required Future<void> Function() onTap,
+  }) {
+    return InkWell(
+      onTap: () async {
+        if (isLoading) return;
+        setState(() => isLoading = true);
+        try {
+          await onTap();
+          if (!mounted) return;
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => DashboardScreen(
+                name: usernameController.text.trim().isEmpty
+                    ? providerName
+                    : usernameController.text.trim(),
+              ),
+            ),
+          );
+        } catch (_) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("$providerName login failed")),
+          );
+        } finally {
+          if (mounted) {
+            setState(() => isLoading = false);
+          }
+        }
+      },
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        width: 56,
+        height: 56,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Image.asset(assetPath, fit: BoxFit.contain),
       ),
     );
   }
@@ -91,7 +148,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   borderRadius: BorderRadius.circular(30),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.06),
+                      color: Colors.black.withValues(alpha: 0.06),
                       blurRadius: 18,
                       offset: const Offset(0, 10),
                     ),
@@ -128,6 +185,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     const SizedBox(height: 24),
+
+                    /// Username
                     TextFormField(
                       controller: usernameController,
                       decoration: _inputDecoration(
@@ -139,12 +198,15 @@ class _LoginScreenState extends State<LoginScreen> {
                           return "Please enter username";
                         }
                         if (value.trim().length < 3) {
-                          return "Username must be at least 3 characters";
+                          return "Min 3 characters required";
                         }
                         return null;
                       },
                     ),
+
                     const SizedBox(height: 16),
+
+                    /// Password
                     TextFormField(
                       controller: passwordController,
                       obscureText: isPasswordHidden,
@@ -169,12 +231,15 @@ class _LoginScreenState extends State<LoginScreen> {
                           return "Please enter password";
                         }
                         if (value.trim().length < 6) {
-                          return "Password must be at least 6 characters";
+                          return "Min 6 characters required";
                         }
                         return null;
                       },
                     ),
+
                     const SizedBox(height: 22),
+
+                    /// Login Button
                     SizedBox(
                       width: double.infinity,
                       height: 54,
@@ -187,13 +252,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                         child: isLoading
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2,
-                                ),
+                            ? const CircularProgressIndicator(
+                                color: Colors.white,
                               )
                             : const Text(
                                 "Login",
@@ -205,30 +265,73 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                       ),
                     ),
+
                     const SizedBox(height: 10),
+
                     TextButton(
                       onPressed: () {},
-                      child: const Text(
-                        "Forgot Password?",
-                        style: TextStyle(color: Colors.black87),
-                      ),
+                      child: const Text("Forgot Password?"),
                     ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      "Or continue with",
-                      style: TextStyle(color: Colors.black54),
+
+                    const SizedBox(height: 20),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Divider(
+                            color: Colors.black.withValues(alpha: 0.15),
+                            thickness: 1,
+                          ),
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 10),
+                          child: Text(
+                            "Or sign up with",
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.black54,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: Divider(
+                            color: Colors.black.withValues(alpha: 0.15),
+                            thickness: 1,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 16),
+
+                    const SizedBox(height: 14),
+
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
-                        _socialButton("assets/images/google.png"),
-                        _socialButton("assets/images/facebook.png"),
-                        _socialButton("assets/images/x.png"),
-                        _socialButton("assets/images/microsoft.png"),
+                        _buildSocialButton(
+                          assetPath: "assets/images/google.png",
+                          providerName: "Google",
+                          onTap: authService.loginWithGoogle,
+                        ),
+                        _buildSocialButton(
+                          assetPath: "assets/images/facebook.png",
+                          providerName: "Facebook",
+                          onTap: authService.loginWithFacebook,
+                        ),
+                        _buildSocialButton(
+                          assetPath: "assets/images/x.png",
+                          providerName: "X",
+                          onTap: authService.loginWithTwitter,
+                        ),
+                        _buildSocialButton(
+                          assetPath: "assets/images/microsoft.png",
+                          providerName: "Microsoft",
+                          onTap: authService.loginWithMicrosoft,
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 22),
+
+                    const SizedBox(height: 16),
+
                     TextButton(
                       onPressed: () {
                         Navigator.push(
@@ -239,9 +342,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         );
                       },
                       child: const Text(
-                        "Don't have an account? Create New Account",
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.black87),
+                        "Create New Account",
                       ),
                     ),
                   ],
@@ -249,32 +350,6 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _socialButton(String imagePath) {
-    return Container(
-      width: 54,
-      height: 54,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Center(
-        child: Image.asset(
-          imagePath,
-          width: 24,
-          height: 24,
-          errorBuilder: (_, __, ___) => const Icon(Icons.image_not_supported),
         ),
       ),
     );

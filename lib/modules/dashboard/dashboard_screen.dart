@@ -1,8 +1,64 @@
 import 'package:flutter/material.dart';
 import '../../widgets/app_background.dart';
+import '../profile/profile_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
-  const DashboardScreen({super.key});
+  final String name;
+  final String age;
+  final String gender;
+  final String height;
+  final String weight;
+  final String goal;
+  final String activity;
+  final String diet;
+  final String meals;
+  final String timeline;
+  final String budget;
+  final String cuisine;
+  final List<String> allergies;
+  final List<String> conditions;
+
+  const DashboardScreen({
+    super.key,
+    this.name = 'User',
+    this.age = '18',
+    this.gender = 'Male',
+    this.height = '170',
+    this.weight = '65',
+    this.goal = 'Maintain Weight',
+    this.activity = 'Moderately Active',
+    this.diet = 'Vegetarian',
+    this.meals = '3 Meals',
+    this.timeline = '1 Month',
+    this.budget = 'Medium',
+    this.cuisine = 'Indian',
+    this.allergies = const [],
+    this.conditions = const [],
+  });
+
+  void _openProfile(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ProfileScreen(
+          name: name,
+          age: age,
+          gender: gender,
+          height: height,
+          weight: weight,
+          goal: goal,
+          activity: activity,
+          diet: diet,
+          meals: meals,
+          timeline: timeline,
+          budget: budget,
+          cuisine: cuisine,
+          allergies: allergies,
+          conditions: conditions,
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,7 +93,7 @@ class DashboardScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _topGreetingCard(),
+                _topGreetingCard(context),
                 const SizedBox(height: 18),
                 const Text(
                   "Your Daily Balance",
@@ -91,43 +147,46 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _topGreetingCard() {
+  Widget _topGreetingCard(BuildContext context) {
     return Align(
       alignment: Alignment.centerLeft,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.9),
-          borderRadius: BorderRadius.circular(22),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircleAvatar(
-              radius: 12,
-              backgroundColor: Color(0xFFF2D8C9),
-              child: Icon(
-                Icons.person,
-                size: 14,
-                color: Colors.black54,
+      child: GestureDetector(
+        onTap: () => _openProfile(context),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.9),
+            borderRadius: BorderRadius.circular(22),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
               ),
-            ),
-            SizedBox(width: 8),
-            Text(
-              "Hello, User",
-              style: TextStyle(
-                fontWeight: FontWeight.w500,
-                color: Colors.black87,
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircleAvatar(
+                radius: 12,
+                backgroundColor: Color(0xFFF2D8C9),
+                child: Icon(
+                  Icons.person,
+                  size: 14,
+                  color: Colors.black54,
+                ),
               ),
-            ),
-          ],
+              const SizedBox(width: 8),
+              Text(
+                "Hello, $name",
+                style: const TextStyle(
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black87,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

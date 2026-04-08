@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../widgets/app_background.dart';
 import '../../widgets/ruler_scale_picker.dart';
-import '../profile/profile_screen.dart';
-
+import '../dashboard/dashboard_screen.dart';
 class MultiParameterForm extends StatefulWidget {
-  const MultiParameterForm({super.key});
+  final String name;
+
+  const MultiParameterForm({super.key, required this.name});
 
   @override
   State<MultiParameterForm> createState() => _MultiParameterFormState();
@@ -64,26 +65,27 @@ class _MultiParameterFormState extends State<MultiParameterForm> {
   if (currentPage >= 12) {
     if (!mounted) return;
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ProfileScreen(
-          age: age,
-          gender: gender,
-          height: height,
-          weight: weight,
-          goal: goal,
-          activity: activityLevel,
-          diet: dietPreference,
-          meals: mealFrequency,
-          timeline: timeline,
-          budget: budget,
-          cuisine: cuisine,
-          allergies: allergies,
-          conditions: medicalConditions,
-        ),
-      ),
-    );
+   Navigator.pushReplacement(
+  context,
+  MaterialPageRoute(
+    builder: (context) => DashboardScreen(
+      name: widget.name,
+      age: age,
+      gender: gender,
+      height: height,
+      weight: weight,
+      goal: goal,
+      activity: activityLevel,
+      diet: dietPreference,
+      meals: mealFrequency,
+      timeline: timeline,
+      budget: budget,
+      cuisine: cuisine,
+      allergies: allergies,
+      conditions: medicalConditions,
+    ),
+  ),
+);
   } else {
     await nextPage();
   }

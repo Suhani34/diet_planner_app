@@ -2,9 +2,11 @@ import 'dart:io' show File;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/foundation.dart';
-import '../../widgets/app_background.dart'; // ✅ ADD THIS
+import '../../widgets/app_background.dart';
+import '../auth/login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
+  final String name; // ✅ ADD
   final String age;
   final String gender;
   final String height;
@@ -21,6 +23,7 @@ class ProfileScreen extends StatefulWidget {
 
   const ProfileScreen({
     super.key,
+    required this.name, // ✅ ADD
     required this.age,
     required this.gender,
     required this.height,
@@ -44,7 +47,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   File? _image;
   final ImagePicker _picker = ImagePicker();
 
-  late String age,
+  late String name, // ✅ ADD
+      age,
       gender,
       height,
       weight,
@@ -62,6 +66,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void initState() {
     super.initState();
 
+    name = widget.name; // ✅ ADD
     age = widget.age;
     gender = widget.gender;
     height = widget.height;
@@ -92,12 +97,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       builder: (_) => Column(
         mainAxisSize: MainAxisSize.min,
-        children: [
-          ListTile(leading: const Icon(Icons.person), title: const Text("Account"), onTap: () {}),
-          ListTile(leading: const Icon(Icons.lock), title: const Text("Privacy"), onTap: () {}),
-          ListTile(leading: const Icon(Icons.notifications), title: const Text("Notifications"), onTap: () {}),
-          ListTile(leading: const Icon(Icons.dark_mode), title: const Text("Dark Mode"), onTap: () {}),
-          ListTile(leading: const Icon(Icons.calculate), title: const Text("Calculate BMI"), onTap: () {}),
+        children: const [
+          ListTile(leading: Icon(Icons.person), title: Text("Account")),
+          ListTile(leading: Icon(Icons.lock), title: Text("Privacy")),
+          ListTile(leading: Icon(Icons.notifications), title: Text("Notifications")),
+          ListTile(leading: Icon(Icons.dark_mode), title: Text("Dark Mode")),
+          ListTile(leading: Icon(Icons.calculate), title: Text("Calculate BMI")),
         ],
       ),
     );
@@ -231,9 +236,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)
-        ],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -245,18 +247,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget chipList(List<String> list) {
-    if (list.isEmpty) return const Text("None");
-    return Wrap(
-      spacing: 6,
-      children: list.map((e) => Chip(label: Text(e))).toList(),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: AppBackground( // ✅ ONLY CHANGE
+      body: AppBackground(
         child: SafeArea(
           child: Column(
             children: [
@@ -288,8 +282,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
 
                       const SizedBox(height: 15),
-                      const Text("Your Profile",
-                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+
+                      // 🔥 NAME SHOW
+                      Text(
+                        "Hello, $name",
+                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                      ),
+
+                      const SizedBox(height: 10),
 
                       buildCard("Age", age),
                       buildCard("Gender", gender),
@@ -318,7 +318,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         icon: const Icon(Icons.logout),
                         label: const Text("Logout"),
                         onPressed: () {
-                          Navigator.pop(context);
+                          Navigator.pushAndRemoveUntil(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const LoginScreen(),
+                            ),
+                            (route) => false,
+                          );
                         },
                       ),
                     ],

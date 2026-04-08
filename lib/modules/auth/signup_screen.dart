@@ -61,7 +61,9 @@ class _SignupScreenState extends State<SignupScreen> {
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (_) => const MultiParameterForm(),
+       builder: (_) => MultiParameterForm(
+  name: nameController.text.trim(),
+),
       ),
     );
   }
