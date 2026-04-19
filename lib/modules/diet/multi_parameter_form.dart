@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../widgets/app_background.dart';
 import '../../widgets/ruler_scale_picker.dart';
-import '../dashboard/dashboard_screen.dart';
+import 'bmi_result_screen.dart';
+import 'meal_plan_service.dart';
 
 class MultiParameterForm extends StatefulWidget {
   const MultiParameterForm({super.key});
@@ -12,7 +13,9 @@ class MultiParameterForm extends StatefulWidget {
 
 class _MultiParameterFormState extends State<MultiParameterForm> {
   final PageController _controller = PageController();
+  final MealPlanService _mealPlanService = MealPlanService();
   int currentPage = 0;
+  bool _isGeneratingPlan = false;
 
   String age = "18";
   String gender = "Male";
@@ -62,16 +65,50 @@ class _MultiParameterFormState extends State<MultiParameterForm> {
 
   Future<void> _handleContinue() async {
     if (currentPage >= 12) {
+      setState(() {
+        _isGeneratingPlan = true;
+      });
+      final result = await _mealPlanService.generateOrGetLockedPlan(
+        profileParams: _buildProfilePayload(),
+      );
       if (!mounted) return;
+      setState(() {
+        _isGeneratingPlan = false;
+      });
+      if (!mounted) return;
+      final heightCm = double.tryParse(height) ?? 160.0;
+      final weightKg = double.tryParse(weight) ?? 60.0;
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => const DashboardScreen(),
+          builder: (_) => BmiResultScreen(
+            mealPlan: result.plan,
+            heightCm: heightCm,
+            weightKg: weightKg,
+          ),
         ),
       );
     } else {
       await nextPage();
     }
+  }
+
+  Map<String, dynamic> _buildProfilePayload() {
+    return {
+      "age": age,
+      "gender": gender,
+      "height": height,
+      "weight": weight,
+      "goal": goal,
+      "activityLevel": activityLevel,
+      "dietPreference": dietPreference,
+      "mealFrequency": mealFrequency,
+      "timeline": timeline,
+      "budget": budget,
+      "cuisine": cuisine,
+      "allergies": allergies,
+      "medicalConditions": medicalConditions,
+    };
   }
 
   Widget buildCard(Widget child) {
@@ -516,12 +553,7 @@ class _MultiParameterFormState extends State<MultiParameterForm> {
                   )),
                   buildCard(buildSingleChoice(
                     "Diet Preference",
-                    [
-                      "Vegetarian",
-                      "Non-Vegetarian",
-                      "Vegan",
-                      "Eggetarian"
-                    ],
+                    ["Vegetarian", "Non-Vegetarian", "Vegan", "Eggetarian"],
                     (v) => dietPreference = v,
                   )),
                   buildCard(buildSingleChoice(
@@ -587,23 +619,32 @@ class _MultiParameterFormState extends State<MultiParameterForm> {
                     child: SizedBox(
                       height: 56,
                       child: ElevatedButton(
-                        onPressed: _handleContinue,
+                        onPressed: _isGeneratingPlan ? null : _handleContinue,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFFF29D72),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(22),
                           ),
                         ),
-                        child: Text(
-                          currentPage >= 12
-                              ? "Save & Continue"
-                              : "Continue",
-                          style: const TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
+                        child: _isGeneratingPlan
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Text(
+                                currentPage >= 12
+                                    ? "Generate Locked AI Plan"
+                                    : "Continue",
+                                style: const TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
                       ),
                     ),
                   ),
