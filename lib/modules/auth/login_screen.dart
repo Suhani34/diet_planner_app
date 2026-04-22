@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+import '../../models/meal_plan_model.dart';
+import '../../services/api_service.dart';
 import '../../widgets/app_background.dart';
 import '../dashboard/dashboard_screen.dart';
+import '../diet/multi_parameter_form.dart';
 import 'auth_service.dart';
 import 'signup_screen.dart';
 
@@ -14,8 +19,8 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  final usernameController = TextEditingController();
-  final passwordController = TextEditingController();
+  final TextEditingController usernameController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
 
   final AuthService authService = AuthService();
 
@@ -29,32 +34,231 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  Future<void> _handleLogin() async {
-    if (!_formKey.currentState!.validate()) return;
+  Future<void> _redirectAfterSocialLogin(UserCredential credential) async {
+    final user = credential.user;
 
-    setState(() => isLoading = true);
+    if (user == null) return;
 
-    final success = await authService.loginWithUsername(
-      usernameController.text.trim(),
-      passwordController.text.trim(),
-    );
+    try {
+      final bool profileComplete = await ApiService.isProfileComplete(user.uid);
 
-    if (!mounted) return;
-    setState(() => isLoading = false);
+      if (!mounted) return;
 
-    if (success) {
+      if (profileComplete) {
+        final mealPlanJson = await ApiService.getLatestMealPlan(user.uid);
+        final mealPlan = MealPlanModel.fromJson(mealPlanJson);
+
+        if (!mounted) return;
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => DashboardScreen(mealPlan: mealPlan),
+          ),
+        );
+      } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const MultiParameterForm(),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => DashboardScreen(
-            name: usernameController.text.trim(),
-          ),
+          builder: (_) => const MultiParameterForm(),
         ),
       );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Invalid username or password")),
+    }
+  }
+
+  Future<void> _handleLogin() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      final credential = await authService.loginWithEmail(
+        usernameController.text.trim(),
+        passwordController.text.trim(),
       );
+
+      final user = credential.user;
+
+      if (user == null) {
+        throw Exception("User not found");
+      }
+
+      final bool profileComplete = await ApiService.isProfileComplete(user.uid);
+
+      if (!mounted) return;
+
+      if (profileComplete) {
+        final mealPlanJson = await ApiService.getLatestMealPlan(user.uid);
+        final mealPlan = MealPlanModel.fromJson(mealPlanJson);
+
+        if (!mounted) return;
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => DashboardScreen(mealPlan: mealPlan),
+          ),
+        );
+      } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const MultiParameterForm(),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint("Email login error: $e");
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Login failed: $e"),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _handleGoogleLogin() async {
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      final credential = await authService.loginWithGoogle();
+
+      if (!mounted) return;
+
+      await _redirectAfterSocialLogin(credential);
+    } catch (e, st) {
+      debugPrint("Google login error: $e");
+      debugPrint("Google login stack: $st");
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Google login failed: $e"),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _handleFacebookLogin() async {
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      final credential = await authService.loginWithFacebook();
+
+      if (!mounted) return;
+
+      await _redirectAfterSocialLogin(credential);
+    } catch (e, st) {
+      debugPrint("Facebook login error: $e");
+      debugPrint("Facebook login stack: $st");
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Facebook login failed: $e"),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _handleXLogin() async {
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      final credential = await authService.loginWithX();
+
+      if (!mounted) return;
+
+      await _redirectAfterSocialLogin(credential);
+    } catch (e, st) {
+      debugPrint("X login error: $e");
+      debugPrint("X login stack: $st");
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("X login failed: $e"),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _handleMicrosoftLogin() async {
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      final credential = await authService.loginWithMicrosoft();
+
+      if (!mounted) return;
+
+      await _redirectAfterSocialLogin(credential);
+    } catch (e, st) {
+      debugPrint("Microsoft login error: $e");
+      debugPrint("Microsoft login stack: $st");
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Microsoft login failed: $e"),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
     }
   }
 
@@ -69,8 +273,7 @@ class _LoginScreenState extends State<LoginScreen> {
       suffixIcon: suffixIcon,
       filled: true,
       fillColor: Colors.white,
-      contentPadding:
-          const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+      contentPadding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(18),
         borderSide: BorderSide.none,
@@ -78,56 +281,28 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildSocialButton({
-    required String assetPath,
-    required String providerName,
-    required Future<void> Function() onTap,
-  }) {
-    return InkWell(
-      onTap: () async {
-        if (isLoading) return;
-        setState(() => isLoading = true);
-        try {
-          await onTap();
-          if (!mounted) return;
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (_) => DashboardScreen(
-                name: usernameController.text.trim().isEmpty
-                    ? providerName
-                    : usernameController.text.trim(),
-              ),
-            ),
-          );
-        } catch (_) {
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("$providerName login failed")),
-          );
-        } finally {
-          if (mounted) {
-            setState(() => isLoading = false);
-          }
-        }
-      },
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        width: 56,
-        height: 56,
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
+  Widget _socialButton(String imagePath) {
+    return Container(
+      width: 54,
+      height: 54,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Center(
+        child: Image.asset(
+          imagePath,
+          width: 24,
+          height: 24,
+          errorBuilder: (_, __, ___) => const Icon(Icons.image_not_supported),
         ),
-        child: Image.asset(assetPath, fit: BoxFit.contain),
       ),
     );
   }
@@ -148,7 +323,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   borderRadius: BorderRadius.circular(30),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.06),
+                      color: Colors.black.withOpacity(0.06),
                       blurRadius: 18,
                       offset: const Offset(0, 10),
                     ),
@@ -185,28 +360,24 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     const SizedBox(height: 24),
-
-                    /// Username
                     TextFormField(
                       controller: usernameController,
+                      keyboardType: TextInputType.emailAddress,
                       decoration: _inputDecoration(
-                        label: "Username",
-                        icon: Icons.person_outline_rounded,
+                        label: "Email",
+                        icon: Icons.email_outlined,
                       ),
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
-                          return "Please enter username";
+                          return "Please enter email";
                         }
-                        if (value.trim().length < 3) {
-                          return "Min 3 characters required";
+                        if (!value.contains("@")) {
+                          return "Please enter a valid email";
                         }
                         return null;
                       },
                     ),
-
                     const SizedBox(height: 16),
-
-                    /// Password
                     TextFormField(
                       controller: passwordController,
                       obscureText: isPasswordHidden,
@@ -231,15 +402,12 @@ class _LoginScreenState extends State<LoginScreen> {
                           return "Please enter password";
                         }
                         if (value.trim().length < 6) {
-                          return "Min 6 characters required";
+                          return "Password must be at least 6 characters";
                         }
                         return null;
                       },
                     ),
-
                     const SizedBox(height: 22),
-
-                    /// Login Button
                     SizedBox(
                       width: double.infinity,
                       height: 54,
@@ -252,8 +420,13 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                         child: isLoading
-                            ? const CircularProgressIndicator(
-                                color: Colors.white,
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
                               )
                             : const Text(
                                 "Login",
@@ -265,73 +438,42 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                       ),
                     ),
-
                     const SizedBox(height: 10),
-
                     TextButton(
                       onPressed: () {},
-                      child: const Text("Forgot Password?"),
+                      child: const Text(
+                        "Forgot Password?",
+                        style: TextStyle(color: Colors.black87),
+                      ),
                     ),
-
-                    const SizedBox(height: 20),
-
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Divider(
-                            color: Colors.black.withValues(alpha: 0.15),
-                            thickness: 1,
-                          ),
-                        ),
-                        const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 10),
-                          child: Text(
-                            "Or sign up with",
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.black54,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: Divider(
-                            color: Colors.black.withValues(alpha: 0.15),
-                            thickness: 1,
-                          ),
-                        ),
-                      ],
+                    const SizedBox(height: 4),
+                    const Text(
+                      "Or continue with",
+                      style: TextStyle(color: Colors.black54),
                     ),
-
-                    const SizedBox(height: 14),
-
+                    const SizedBox(height: 16),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
-                        _buildSocialButton(
-                          assetPath: "assets/images/google.png",
-                          providerName: "Google",
-                          onTap: authService.loginWithGoogle,
+                        GestureDetector(
+                          onTap: isLoading ? null : _handleGoogleLogin,
+                          child: _socialButton("assets/images/google.png"),
                         ),
-                        _buildSocialButton(
-                          assetPath: "assets/images/facebook.png",
-                          providerName: "Facebook",
-                          onTap: authService.loginWithFacebook,
+                        GestureDetector(
+                          onTap: isLoading ? null : _handleFacebookLogin,
+                          child: _socialButton("assets/images/facebook.png"),
                         ),
-                        _buildSocialButton(
-                          assetPath: "assets/images/x.png",
-                          providerName: "X",
-                          onTap: authService.loginWithTwitter,
+                        GestureDetector(
+                          onTap: isLoading ? null : _handleXLogin,
+                          child: _socialButton("assets/images/x.png"),
                         ),
-                        _buildSocialButton(
-                          assetPath: "assets/images/microsoft.png",
-                          providerName: "Microsoft",
-                          onTap: authService.loginWithMicrosoft,
+                        GestureDetector(
+                          onTap: isLoading ? null : _handleMicrosoftLogin,
+                          child: _socialButton("assets/images/microsoft.png"),
                         ),
                       ],
                     ),
-
-                    const SizedBox(height: 16),
-
+                    const SizedBox(height: 22),
                     TextButton(
                       onPressed: () {
                         Navigator.push(
@@ -342,7 +484,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         );
                       },
                       child: const Text(
-                        "Create New Account",
+                        "Don't have an account? Create New Account",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.black87),
                       ),
                     ),
                   ],

@@ -1,320 +1,354 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+import '../../models/meal_plan_model.dart';
 import '../../widgets/app_background.dart';
-import '../profile/profile_screen.dart';
+import '../auth/auth_service.dart';
+import '../auth/login_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
-  final String name;
-  final String age;
-  final String gender;
-  final String height;
-  final String weight;
-  final String goal;
-  final String activity;
-  final String diet;
-  final String meals;
-  final String timeline;
-  final String budget;
-  final String cuisine;
-  final List<String> allergies;
-  final List<String> conditions;
+  final MealPlanModel mealPlan;
 
   const DashboardScreen({
     super.key,
-    this.name = 'User',
-    this.age = '18',
-    this.gender = 'Male',
-    this.height = '170',
-    this.weight = '65',
-    this.goal = 'Maintain Weight',
-    this.activity = 'Moderately Active',
-    this.diet = 'Vegetarian',
-    this.meals = '3 Meals',
-    this.timeline = '1 Month',
-    this.budget = 'Medium',
-    this.cuisine = 'Indian',
-    this.allergies = const [],
-    this.conditions = const [],
+    required this.mealPlan,
   });
 
-  void _openProfile(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ProfileScreen(
-          name: name,
-          age: age,
-          gender: gender,
-          height: height,
-          weight: weight,
-          goal: goal,
-          activity: activity,
-          diet: diet,
-          meals: meals,
-          timeline: timeline,
-          budget: budget,
-          cuisine: cuisine,
-          allergies: allergies,
-          conditions: conditions,
+  Future<void> _handleLogout(BuildContext context) async {
+    try {
+      await AuthService().logout();
+
+      if (!context.mounted) return;
+
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Logout failed: $e"),
         ),
-      ),
-    );
+      );
+    }
+  }
+
+  IconData _getMealIcon(String mealKey) {
+    switch (mealKey) {
+      case "breakfast":
+        return Icons.free_breakfast_rounded;
+      case "lunch":
+        return Icons.lunch_dining_rounded;
+      case "dinner":
+        return Icons.dinner_dining_rounded;
+      case "snack":
+      case "snack_1":
+      case "snack_2":
+      case "snacks":
+        return Icons.cookie_rounded;
+      default:
+        return Icons.restaurant_rounded;
+    }
+  }
+
+  Color _getMealColor(String mealKey) {
+    switch (mealKey) {
+      case "breakfast":
+        return const Color(0xFFFFD9B8);
+      case "lunch":
+        return const Color(0xFFCDE9C8);
+      case "dinner":
+        return const Color(0xFFCFE7D8);
+      case "snack":
+      case "snack_1":
+      case "snack_2":
+      case "snacks":
+        return const Color(0xFFFFD2C8);
+      default:
+        return const Color(0xFFE6DDF7);
+    }
+  }
+
+  String _formatMealTitle(String key) {
+    return key
+        .replaceAll("_", " ")
+        .split(" ")
+        .map(
+          (word) => word.isEmpty
+              ? word
+              : word[0].toUpperCase() + word.substring(1),
+        )
+        .join(" ");
   }
 
   @override
   Widget build(BuildContext context) {
-    final meals = [
-      {
-        "title": "Breakfast",
-        "icon": Icons.free_breakfast_rounded,
-        "color": const Color(0xFFF6B7C3),
-      },
-      {
-        "title": "Lunch",
-        "icon": Icons.lunch_dining_rounded,
-        "color": const Color(0xFFFFD59E),
-      },
-      {
-        "title": "Snack",
-        "icon": Icons.cookie_rounded,
-        "color": const Color(0xFFC9C4F7),
-      },
-      {
-        "title": "Dinner",
-        "icon": Icons.dinner_dining_rounded,
-        "color": const Color(0xFFAEDDC8),
-      },
-    ];
+    final User? user = FirebaseAuth.instance.currentUser;
+    final String displayName =
+        user?.displayName?.trim().isNotEmpty == true
+            ? user!.displayName!
+            : "User";
+    final String emailText =
+        user?.email?.trim().isNotEmpty == true ? user!.email! : "Signed in";
+
+    final mealEntries = mealPlan.meals.entries.toList();
 
     return Scaffold(
       body: AppBackground(
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _topGreetingCard(context),
-                const SizedBox(height: 18),
-                const Text(
-                  "Your Daily Balance",
-                  style: TextStyle(
-                    fontSize: 34,
-                    fontWeight: FontWeight.bold,
-                    height: 1.05,
-                    color: Color(0xFF262626),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  "Day 1",
-                  style: TextStyle(
-                    fontSize: 18,
-                    color: Colors.black54,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                const _MacroChartCard(),
-                const SizedBox(height: 20),
-                Expanded(
-                  child: ListView.separated(
-                    itemCount: meals.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 14),
-                    itemBuilder: (context, index) {
-                      final meal = meals[index];
-                      return _MealCard(
-                        title: meal["title"] as String,
-                        icon: meal["icon"] as IconData,
-                        color: meal["color"] as Color,
-                        onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text("${meal["title"]} clicked"),
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(height: 8),
-                _bottomNavBar(),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _topGreetingCard(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: GestureDetector(
-        onTap: () => _openProfile(context),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.9),
-            borderRadius: BorderRadius.circular(22),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 8,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const CircleAvatar(
-                radius: 12,
-                backgroundColor: Color(0xFFF2D8C9),
-                child: Icon(
-                  Icons.person,
-                  size: 14,
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFDF8F4),
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.04),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          const CircleAvatar(
+                            radius: 18,
+                            backgroundColor: Color(0xFFFFE9DA),
+                            child: Icon(
+                              Icons.person_rounded,
+                              color: Color(0xFFF29D72),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  "Hello, $displayName",
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF262626),
+                                  ),
+                                ),
+                                Text(
+                                  emailText,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.black54,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  IconButton(
+                    onPressed: () => _handleLogout(context),
+                    icon: const Icon(Icons.logout_rounded),
+                    tooltip: "Logout",
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                "Daily Diet Plan",
+                style: TextStyle(
+                  fontSize: 30,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF262626),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                "Day ${mealPlan.dayNumber}",
+                style: const TextStyle(
+                  fontSize: 18,
                   color: Colors.black54,
                 ),
               ),
-              const SizedBox(width: 8),
-              Text(
-                "Hello, $name",
-                style: const TextStyle(
-                  fontWeight: FontWeight.w500,
-                  color: Colors.black87,
+              const SizedBox(height: 18),
+              _MacroGoalCard(mealPlan: mealPlan),
+              const SizedBox(height: 16),
+              Expanded(
+                child: ListView.separated(
+                  itemCount: mealEntries.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 14),
+                  itemBuilder: (context, index) {
+                    final entry = mealEntries[index];
+                    final mealKey = entry.key;
+                    final title = _formatMealTitle(mealKey);
+
+                    return _MealCard(
+                      title: title,
+                      icon: _getMealIcon(mealKey),
+                      bgColor: _getMealColor(mealKey),
+                      onTap: () {
+                        final foods = entry.value;
+                        final foodNames = foods.map((e) => e.name).join(", ");
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              foodNames.isEmpty ? "$title clicked" : foodNames,
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
                 ),
               ),
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _bottomNavBar() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFDF7F2),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 14,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: const Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _NavItem(
-            icon: Icons.home_rounded,
-            isSelected: true,
-          ),
-          _NavItem(
-            icon: Icons.bar_chart_rounded,
-            isSelected: false,
-          ),
-          _NavItem(
-            icon: Icons.bookmark_border_rounded,
-            isSelected: false,
-          ),
-          _NavItem(
-            icon: Icons.person_outline_rounded,
-            isSelected: false,
-          ),
-        ],
       ),
     );
   }
 }
 
-class _MacroChartCard extends StatelessWidget {
-  const _MacroChartCard();
+class _MacroGoalCard extends StatelessWidget {
+  final MealPlanModel mealPlan;
+
+  const _MacroGoalCard({
+    required this.mealPlan,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xFFFDF7F2),
+        color: const Color(0xFFFDF8F4),
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
+            blurRadius: 14,
+            offset: const Offset(0, 7),
           ),
         ],
       ),
-      child: Row(
+      child: Column(
         children: [
-          const Expanded(
-            flex: 5,
-            child: SizedBox(
-              height: 180,
-              child: CustomPaint(
-                painter: MacroRingPainter(),
-                child: Center(
+          SizedBox(
+            height: 160,
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 5,
+                  child: SizedBox(
+                    height: 150,
+                    child: CustomPaint(
+                      painter: const MacroRingPainter(),
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text(
+                              "Total",
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.black54,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              "${mealPlan.totalCalories}",
+                              style: const TextStyle(
+                                fontSize: 30,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const Text(
+                              "kcal",
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.black54,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 4,
                   child: Column(
-                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(
-                        "Consumed",
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.black54,
-                        ),
+                      _LegendItem(
+                        color: const Color(0xFFF6B7C3),
+                        title: "Fat",
+                        value: "${mealPlan.fatsG}g",
                       ),
-                      SizedBox(height: 4),
-                      Text(
-                        "1600",
-                        style: TextStyle(
-                          fontSize: 34,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF262626),
-                        ),
+                      const SizedBox(height: 14),
+                      _LegendItem(
+                        color: const Color(0xFFFFC98B),
+                        title: "Protein",
+                        value: "${mealPlan.proteinG}g",
                       ),
-                      Text(
-                        "kcal",
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.black54,
-                        ),
+                      const SizedBox(height: 14),
+                      _LegendItem(
+                        color: const Color(0xFFC8C4F8),
+                        title: "Carbs",
+                        value: "${mealPlan.carbsG}g",
                       ),
                     ],
                   ),
                 ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            flex: 4,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                _LegendItem(
-                  color: Color(0xFFF6B7C3),
-                  title: "Fat",
-                  value: "45/65g",
-                ),
-                SizedBox(height: 14),
-                _LegendItem(
-                  color: Color(0xFFFFC98B),
-                  title: "Protein",
-                  value: "45/65g",
-                ),
-                SizedBox(height: 14),
-                _LegendItem(
-                  color: Color(0xFFC8C4F8),
-                  title: "Carbs",
-                  value: "45/65g",
-                ),
               ],
             ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              const Icon(
+                Icons.track_changes_rounded,
+                color: Color(0xFFF29D72),
+              ),
+              const SizedBox(width: 10),
+              const Text(
+                "Today's Goal",
+                style: TextStyle(
+                  fontSize: 18,
+                  color: Colors.black54,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                "${mealPlan.totalCalories} kcal",
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFFF29D72),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -345,7 +379,7 @@ class _LegendItem extends StatelessWidget {
             shape: BoxShape.circle,
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 8),
         Expanded(
           child: Text(
             title,
@@ -360,7 +394,6 @@ class _LegendItem extends StatelessWidget {
           style: const TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF262626),
           ),
         ),
       ],
@@ -371,13 +404,13 @@ class _LegendItem extends StatelessWidget {
 class _MealCard extends StatelessWidget {
   final String title;
   final IconData icon;
-  final Color color;
+  final Color bgColor;
   final VoidCallback onTap;
 
   const _MealCard({
     required this.title,
     required this.icon,
-    required this.color,
+    required this.bgColor,
     required this.onTap,
   });
 
@@ -387,12 +420,12 @@ class _MealCard extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(26),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
           decoration: BoxDecoration(
-            color: const Color(0xFFFDF7F2),
-            borderRadius: BorderRadius.circular(24),
+            color: const Color(0xFFFDF8F4),
+            borderRadius: BorderRadius.circular(26),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.05),
@@ -404,16 +437,16 @@ class _MealCard extends StatelessWidget {
           child: Row(
             children: [
               Container(
-                width: 58,
-                height: 58,
+                width: 64,
+                height: 64,
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.28),
-                  borderRadius: BorderRadius.circular(18),
+                  color: bgColor,
+                  borderRadius: BorderRadius.circular(20),
                 ),
                 child: Icon(
                   icon,
-                  color: const Color(0xFF4A4A4A),
-                  size: 28,
+                  color: const Color(0xFF5B4B45),
+                  size: 30,
                 ),
               ),
               const SizedBox(width: 16),
@@ -421,7 +454,7 @@ class _MealCard extends StatelessWidget {
                 child: Text(
                   title,
                   style: const TextStyle(
-                    fontSize: 28,
+                    fontSize: 26,
                     fontWeight: FontWeight.w600,
                     color: Color(0xFF262626),
                   ),
@@ -440,33 +473,6 @@ class _MealCard extends StatelessWidget {
   }
 }
 
-class _NavItem extends StatelessWidget {
-  final IconData icon;
-  final bool isSelected;
-
-  const _NavItem({
-    required this.icon,
-    required this.isSelected,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 42,
-      height: 42,
-      decoration: BoxDecoration(
-        color: isSelected ? const Color(0xFF262238) : Colors.transparent,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Icon(
-        icon,
-        color: isSelected ? Colors.white : Colors.black38,
-        size: 22,
-      ),
-    );
-  }
-}
-
 class MacroRingPainter extends CustomPainter {
   const MacroRingPainter();
 
@@ -474,17 +480,17 @@ class MacroRingPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     const strokeWidth = 14.0;
-    final radius = (size.width / 2) - 18;
+    final radius = (size.width / 2) - 16;
 
-    final backgroundPaint = Paint()
-      ..color = const Color(0xFFF2ECE6)
+    final basePaint = Paint()
+      ..color = const Color(0xFFF0EAE4)
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round;
 
-    canvas.drawCircle(center, radius, backgroundPaint);
+    canvas.drawCircle(center, radius, basePaint);
 
-    void drawArc(Color color, double startAngle, double sweepAngle) {
+    void drawArc(Color color, double start, double sweep) {
       final paint = Paint()
         ..color = color
         ..style = PaintingStyle.stroke
@@ -493,16 +499,16 @@ class MacroRingPainter extends CustomPainter {
 
       canvas.drawArc(
         Rect.fromCircle(center: center, radius: radius),
-        startAngle,
-        sweepAngle,
+        start,
+        sweep,
         false,
         paint,
       );
     }
 
-    drawArc(const Color(0xFFFFC98B), 2.7, 1.1);
-    drawArc(const Color(0xFFF6B7C3), 4.0, 1.25);
-    drawArc(const Color(0xFFC8C4F8), 5.5, 1.2);
+    drawArc(const Color(0xFFFFC98B), 2.75, 1.05);
+    drawArc(const Color(0xFFF6B7C3), 3.95, 1.2);
+    drawArc(const Color(0xFFC8C4F8), 5.35, 1.15);
   }
 
   @override
