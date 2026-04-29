@@ -2,108 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../models/meal_plan_model.dart';
-import '../diet/food_item.dart';
-import '../diet/meal_plan.dart';
-import '../diet/meal_detail_screen.dart';
+import '../../services/api_service.dart';
 import '../../widgets/app_background.dart';
 import '../auth/auth_service.dart';
 import '../auth/login_screen.dart';
+import '../diet/food_item.dart';
+import '../diet/meal_detail_screen.dart';
 
-class DashboardScreen extends StatelessWidget {
-  final MealPlanModel mealPlan;
-
-  const DashboardScreen({
-    super.key,
-    required this.mealPlan,
-  });
-
-  Future<void> _handleLogout(BuildContext context) async {
-    try {
-      await AuthService().logout();
-
-      if (!context.mounted) return;
-
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-        (route) => false,
-      );
-    } catch (e) {
-      if (!context.mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Logout failed: $e"),
-        ),
-      );
-    }
-  }
-
-  IconData _getMealIcon(String mealKey) {
-    switch (mealKey) {
-      case "breakfast":
-        return Icons.free_breakfast_rounded;
-      case "lunch":
-        return Icons.lunch_dining_rounded;
-      case "dinner":
-        return Icons.dinner_dining_rounded;
-      case "snack":
-      case "snack_1":
-      case "snack_2":
-      case "snacks":
-        return Icons.cookie_rounded;
-      default:
-        return Icons.restaurant_rounded;
-    }
-  }
-
-  Color _getMealColor(String mealKey) {
-    switch (mealKey) {
-      case "breakfast":
-        return const Color(0xFFFFD9B8);
-      case "lunch":
-        return const Color(0xFFCDE9C8);
-      case "dinner":
-        return const Color(0xFFCFE7D8);
-      case "snack":
-      case "snack_1":
-      case "snack_2":
-      case "snacks":
-        return const Color(0xFFFFD2C8);
-      default:
-        return const Color(0xFFE6DDF7);
-    }
-  }
-
-  String _formatMealTitle(String key) {
-    return key
-        .replaceAll("_", " ")
-        .split(" ")
-        .map(
-          (word) => word.isEmpty
-              ? word
-              : word[0].toUpperCase() + word.substring(1),
-        )
-        .join(" ");
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final User? user = FirebaseAuth.instance.currentUser;
-    final String displayName =
-        user?.displayName?.trim().isNotEmpty == true
-            ? user!.displayName!
-            : "User";
-    final String emailText =
-        user?.email?.trim().isNotEmpty == true ? user!.email! : "Signed in";
-
-    final mealEntries = mealPlan.meals.entries.toList();
-  final MealPlan? mealPlan;
+class DashboardScreen extends StatefulWidget {
+  final MealPlanModel? mealPlan;
   final bool isPlanLocked;
-
-  /// Signup flow se aane par user ki height/weight — BMI yahi se निकलेगा।
   final double? heightCm;
   final double? weightKg;
+  final bool shouldGenerateMeal;
+  final Map<String, dynamic>? profilePayload;
 
   const DashboardScreen({
     super.key,
@@ -111,15 +23,157 @@ class DashboardScreen extends StatelessWidget {
     this.isPlanLocked = false,
     this.heightCm,
     this.weightKg,
+    this.shouldGenerateMeal = false,
+    this.profilePayload,
   });
 
   @override
-  Widget build(BuildContext context) {
-    final defaultMeals = [
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  MealPlanModel? mealPlan;
+  bool isLoadingMeal = false;
+  String? mealError;
+
+  @override
+  void initState() {
+    super.initState();
+    mealPlan = widget.mealPlan;
+
+    if (widget.shouldGenerateMeal) {
+      _saveAndGenerateMeal();
+    } else if (mealPlan == null) {
+      _loadLatestMeal();
+    }
+  }
+
+  Future<void> _saveAndGenerateMeal() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    setState(() {
+      isLoadingMeal = true;
+      mealError = null;
+    });
+
+    try {
+      if (widget.profilePayload != null) {
+        await ApiService.saveProfile(widget.profilePayload!);
+      }
+
+      final json = await ApiService.generateMealPlan(user.uid);
+
+      if (!mounted) return;
+
+      setState(() {
+        mealPlan = MealPlanModel.fromJson(json);
+        isLoadingMeal = false;
+      });
+    } catch (e) {
+      debugPrint("Generate meal failed: $e");
+
+      if (!mounted) return;
+
+      setState(() {
+        mealError = "AI meal generation failed. Showing default dashboard.";
+        isLoadingMeal = false;
+      });
+    }
+  }
+
+  Future<void> _loadLatestMeal() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    setState(() {
+      isLoadingMeal = true;
+      mealError = null;
+    });
+
+    try {
+      final json = await ApiService.getLatestMealPlan(user.uid);
+
+      if (!mounted) return;
+
+      setState(() {
+        mealPlan = MealPlanModel.fromJson(json);
+        isLoadingMeal = false;
+      });
+    } catch (e) {
+      debugPrint("Latest meal load failed: $e");
+
+      if (!mounted) return;
+
+      setState(() {
+        mealError = "No AI meal loaded yet.";
+        isLoadingMeal = false;
+      });
+    }
+  }
+
+  Future<void> _handleLogout() async {
+    await AuthService().logout();
+
+    if (!mounted) return;
+
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false,
+    );
+  }
+
+  IconData _mealIcon(String mealName) {
+    final key = mealName.toLowerCase();
+
+    if (key.contains("breakfast")) return Icons.free_breakfast_rounded;
+    if (key.contains("lunch")) return Icons.lunch_dining_rounded;
+    if (key.contains("dinner")) return Icons.dinner_dining_rounded;
+    if (key.contains("snack")) return Icons.cookie_rounded;
+
+    return Icons.restaurant_rounded;
+  }
+
+  Color _mealColor(String mealName) {
+    final key = mealName.toLowerCase();
+
+    if (key.contains("breakfast")) return const Color(0xFFF6B7C3);
+    if (key.contains("lunch")) return const Color(0xFFFFD59E);
+    if (key.contains("dinner")) return const Color(0xFFAEDDC8);
+    if (key.contains("snack")) return const Color(0xFFC9C4F7);
+
+    return const Color(0xFFE7D9CC);
+  }
+
+  String _formatMealTitle(String key) {
+    return key
+        .replaceAll("_", " ")
+        .split(" ")
+        .map((word) {
+          if (word.isEmpty) return word;
+          return word[0].toUpperCase() + word.substring(1);
+        })
+        .join(" ");
+  }
+
+  List<FoodItem> _convertMealItems(List<dynamic> items) {
+    return items.map((item) {
+      return FoodItem(
+        name: item.name,
+        calories: item.calories.toInt(),
+        protein: item.proteinG.toDouble(),
+        carbs: item.carbsG.toDouble(),
+        fat: item.fatsG.toDouble(),
+        serving: "",
+      );
+    }).toList();
+  }
+
+  List<Map<String, dynamic>> _defaultMeals() {
+    return [
       {
         "title": "Breakfast",
-        "icon": Icons.free_breakfast_rounded,
-        "color": const Color(0xFFF6B7C3),
         "foods": const [
           FoodItem(
             name: "Oats with Milk",
@@ -141,8 +195,6 @@ class DashboardScreen extends StatelessWidget {
       },
       {
         "title": "Lunch",
-        "icon": Icons.lunch_dining_rounded,
-        "color": const Color(0xFFFFD59E),
         "foods": const [
           FoodItem(
             name: "Brown Rice",
@@ -153,42 +205,17 @@ class DashboardScreen extends StatelessWidget {
             serving: "1 cup",
           ),
           FoodItem(
-            name: "Grilled Paneer",
-            calories: 280,
-            protein: 18,
-            carbs: 6,
-            fat: 20,
-            serving: "120 g",
-          ),
-        ],
-      },
-      {
-        "title": "Snack",
-        "icon": Icons.cookie_rounded,
-        "color": const Color(0xFFC9C4F7),
-        "foods": const [
-          FoodItem(
-            name: "Greek Yogurt",
-            calories: 120,
-            protein: 10,
-            carbs: 8,
-            fat: 4,
-            serving: "150 g",
-          ),
-          FoodItem(
-            name: "Almonds",
-            calories: 80,
-            protein: 3,
-            carbs: 3,
+            name: "Dal",
+            calories: 190,
+            protein: 11,
+            carbs: 21,
             fat: 7,
-            serving: "12 pieces",
+            serving: "1 bowl",
           ),
         ],
       },
       {
         "title": "Dinner",
-        "icon": Icons.dinner_dining_rounded,
-        "color": const Color(0xFFAEDDC8),
         "foods": const [
           FoodItem(
             name: "Chapati",
@@ -199,89 +226,66 @@ class DashboardScreen extends StatelessWidget {
             serving: "2 pieces",
           ),
           FoodItem(
-            name: "Dal Tadka",
-            calories: 190,
-            protein: 11,
-            carbs: 21,
-            fat: 7,
+            name: "Vegetable Curry",
+            calories: 180,
+            protein: 5,
+            carbs: 25,
+            fat: 6,
             serving: "1 bowl",
           ),
         ],
       },
     ];
+  }
 
-    final mealMap = mealPlan?.meals ??
-        {
-          for (final meal in defaultMeals)
-            meal["title"] as String: meal["foods"] as List<FoodItem>,
-        };
-    final meals = mealMap.entries
-        .map(
-          (entry) => {
-            "title": entry.key,
-            "foods": entry.value,
-            "icon": _mealIcon(entry.key),
-            "color": _mealColor(entry.key),
-          },
-        )
-        .toList();
+  List<Map<String, dynamic>> _mealsForUi() {
+    if (mealPlan == null) {
+      return _defaultMeals();
+    }
+
+    return mealPlan!.meals.entries.map((entry) {
+      return {
+        "title": _formatMealTitle(entry.key),
+        "foods": _convertMealItems(entry.value),
+      };
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    final meals = _mealsForUi();
 
     final allFoods = meals
         .map((meal) => meal["foods"] as List<FoodItem>)
         .expand((foods) => foods)
         .toList();
-    final consumedCalories =
+
+    final calories = mealPlan?.totalCalories.toInt() ??
         allFoods.fold<int>(0, (sum, food) => sum + food.calories);
-    const calorieGoal = 2200;
-    final totalProtein = allFoods.fold<double>(0, (s, f) => s + f.protein);
-    final totalCarbs = allFoods.fold<double>(0, (s, f) => s + f.carbs);
-    final totalFat = allFoods.fold<double>(0, (s, f) => s + f.fat);
-    final proteinGoal = (calorieGoal * 0.25 / 4).round();
-    final carbsGoal = (calorieGoal * 0.45 / 4).round();
-    final fatGoal = (calorieGoal * 0.30 / 9).round();
+
+    final protein = mealPlan?.proteinG.toDouble() ??
+        allFoods.fold<double>(0, (sum, food) => sum + food.protein);
+
+    final carbs = mealPlan?.carbsG.toDouble() ??
+        allFoods.fold<double>(0, (sum, food) => sum + food.carbs);
+
+    final fats = mealPlan?.fatsG.toDouble() ??
+        allFoods.fold<double>(0, (sum, food) => sum + food.fat);
 
     return Scaffold(
       body: AppBackground(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFDF8F4),
-                        borderRadius: BorderRadius.circular(24),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.04),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          const CircleAvatar(
-                            radius: 18,
-                            backgroundColor: Color(0xFFFFE9DA),
-                            child: Icon(
-                              Icons.person_rounded,
-                              color: Color(0xFFF29D72),
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _topGreetingCard(),
+                _TopBar(
+                  name: user?.displayName ?? "User",
+                  email: user?.email ?? "Signed in",
+                  onLogout: _handleLogout,
+                ),
                 const SizedBox(height: 18),
                 const Text(
                   "Your Daily Balance",
@@ -293,237 +297,153 @@ class DashboardScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
-                  "Day 1",
-                  style: TextStyle(
+                Text(
+                  mealPlan == null
+                      ? "Default plan"
+                      : "Day ${mealPlan!.dayNumber}",
+                  style: const TextStyle(
                     fontSize: 18,
                     color: Colors.black54,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                const SizedBox(height: 20),
-                if (isPlanLocked) ...[
-                  const _PlanLockBanner(),
-                  const SizedBox(height: 14),
+                const SizedBox(height: 14),
+                if (isLoadingMeal)
+                  const LinearProgressIndicator(
+                    minHeight: 5,
+                    color: Color(0xFFF29D72),
+                  ),
+                if (mealError != null) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    mealError!,
+                    style: const TextStyle(
+                      color: Colors.black54,
+                      fontSize: 13,
+                    ),
+                  ),
                 ],
-                _MacroChartCard(
-                  consumedCalories: consumedCalories,
-                  calorieGoal: calorieGoal,
-                  protein: totalProtein,
-                  carbs: totalCarbs,
-                  fat: totalFat,
-                  proteinGoal: proteinGoal,
-                  carbsGoal: carbsGoal,
-                  fatGoal: fatGoal,
+                const SizedBox(height: 16),
+                _MacroCard(
+                  calories: calories,
+                  protein: protein,
+                  carbs: carbs,
+                  fats: fats,
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 18),
                 Expanded(
                   child: ListView.separated(
                     itemCount: meals.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 14),
                     itemBuilder: (context, index) {
                       final meal = meals[index];
+                      final title = meal["title"] as String;
+                      final foods = meal["foods"] as List<FoodItem>;
+
                       return _MealCard(
-                        title: meal["title"] as String,
-                        icon: meal["icon"] as IconData,
-                        color: meal["color"] as Color,
+                        title: title,
+                        icon: _mealIcon(title),
+                        bgColor: _mealColor(title),
                         onTap: () {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (_) => MealDetailScreen(
-                                mealName: meal["title"] as String,
-                                foods: meal["foods"] as List<FoodItem>,
+                                mealName: title,
+                                foods: foods,
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  "Hello, $displayName",
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xFF262626),
-                                  ),
-                                ),
-                                Text(
-                                  emailText,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.black54,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                          );
+                        },
+                      );
+                    },
                   ),
-                  const SizedBox(width: 10),
-                  IconButton(
-                    onPressed: () => _handleLogout(context),
-                    icon: const Icon(Icons.logout_rounded),
-                    tooltip: "Logout",
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              const Text(
-                "Daily Diet Plan",
-                style: TextStyle(
-                  fontSize: 30,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF262626),
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                "Day ${mealPlan.dayNumber}",
-                style: const TextStyle(
-                  fontSize: 18,
-                  color: Colors.black54,
-                ),
-              ),
-              const SizedBox(height: 18),
-              _MacroGoalCard(mealPlan: mealPlan),
-              const SizedBox(height: 16),
-              Expanded(
-                child: ListView.separated(
-                  itemCount: mealEntries.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 14),
-                  itemBuilder: (context, index) {
-                    final entry = mealEntries[index];
-                    final mealKey = entry.key;
-                    final title = _formatMealTitle(mealKey);
-
-                    return _MealCard(
-                      title: title,
-                      icon: _getMealIcon(mealKey),
-                      bgColor: _getMealColor(mealKey),
-                      onTap: () {
-                        final foods = entry.value;
-                        final foodNames = foods.map((e) => e.name).join(", ");
-
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              foodNames.isEmpty ? "$title clicked" : foodNames,
-                            ),
-                          ),
-                        );
-                      },
-                    );
-                  },
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
-
-  IconData _mealIcon(String mealName) {
-    switch (mealName.toLowerCase()) {
-      case "breakfast":
-        return Icons.free_breakfast_rounded;
-      case "lunch":
-        return Icons.lunch_dining_rounded;
-      case "snack":
-        return Icons.cookie_rounded;
-      case "dinner":
-        return Icons.dinner_dining_rounded;
-      default:
-        return Icons.restaurant_rounded;
-    }
-  }
-
-  Color _mealColor(String mealName) {
-    switch (mealName.toLowerCase()) {
-      case "breakfast":
-        return const Color(0xFFF6B7C3);
-      case "lunch":
-        return const Color(0xFFFFD59E);
-      case "snack":
-        return const Color(0xFFC9C4F7);
-      case "dinner":
-        return const Color(0xFFAEDDC8);
-      default:
-        return const Color(0xFFE7D9CC);
-    }
-  }
 }
 
-class _MacroGoalCard extends StatelessWidget {
-  final MealPlanModel mealPlan;
+class _TopBar extends StatelessWidget {
+  final String name;
+  final String email;
+  final VoidCallback onLogout;
 
-  const _MacroGoalCard({
-    required this.mealPlan,
+  const _TopBar({
+    required this.name,
+    required this.email,
+    required this.onLogout,
   });
-class _PlanLockBanner extends StatelessWidget {
-  const _PlanLockBanner();
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFEFEAFE),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: const Row(
-        children: [
-          Icon(Icons.lock_rounded, color: Color(0xFF6E61F4)),
-          SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              "AI meal plan generated and locked for selected parameters.",
-              style: TextStyle(
-                fontSize: 13,
-                color: Color(0xFF423A66),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+    return Row(
+      children: [
+        const CircleAvatar(
+          backgroundColor: Color(0xFFFFE9DA),
+          child: Icon(
+            Icons.person_rounded,
+            color: Color(0xFFF29D72),
           ),
-        ],
-      ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "Hello, $name",
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              Text(
+                email,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Colors.black54,
+                ),
+              ),
+            ],
+          ),
+        ),
+        IconButton(
+          onPressed: onLogout,
+          icon: const Icon(Icons.logout_rounded),
+        ),
+      ],
     );
   }
 }
 
-class _MacroChartCard extends StatelessWidget {
-  final int consumedCalories;
-  final int calorieGoal;
+class _MacroCard extends StatelessWidget {
+  final int calories;
   final double protein;
   final double carbs;
-  final double fat;
-  final int proteinGoal;
-  final int carbsGoal;
-  final int fatGoal;
+  final double fats;
 
-  const _MacroChartCard({
-    required this.consumedCalories,
-    required this.calorieGoal,
+  const _MacroCard({
+    required this.calories,
     required this.protein,
     required this.carbs,
-    required this.fat,
-    required this.proteinGoal,
-    required this.carbsGoal,
-    required this.fatGoal,
+    required this.fats,
   });
 
   @override
   Widget build(BuildContext context) {
-    final remaining = calorieGoal - consumedCalories;
+    final total = protein + carbs + fats;
+
+    final proteinPercent = total == 0 ? 0.0 : protein / total;
+    final carbsPercent = total == 0 ? 0.0 : carbs / total;
+    final fatsPercent = total == 0 ? 0.0 : fats / total;
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -537,211 +457,67 @@ class _MacroChartCard extends StatelessWidget {
           ),
         ],
       ),
-      child: Column(
+      child: Row(
         children: [
-          SizedBox(
-            height: 160,
-            child: Row(
-              children: [
-                Expanded(
-                  flex: 5,
-                  child: SizedBox(
-                    height: 150,
-                    child: CustomPaint(
-                      painter: const MacroRingPainter(),
-                      child: Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Text(
-                              "Total",
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.black54,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              "${mealPlan.totalCalories}",
-                              style: const TextStyle(
-                                fontSize: 30,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const Text(
-                              "kcal",
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.black54,
-                              ),
-                            ),
-                          ],
+          Expanded(
+            flex: 5,
+            child: SizedBox(
+              height: 150,
+              child: CustomPaint(
+                painter: MacroRingPainter(
+                  proteinPercent,
+                  carbsPercent,
+                  fatsPercent,
+                ),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        "$calories",
+                        style: const TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF262626),
                         ),
                       ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  flex: 4,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _LegendItem(
-                        color: const Color(0xFFF6B7C3),
-                        title: "Fat",
-                        value: "${mealPlan.fatsG}g",
-                      ),
-                      const SizedBox(height: 14),
-                      _LegendItem(
-                        color: const Color(0xFFFFC98B),
-                        title: "Protein",
-                        value: "${mealPlan.proteinG}g",
-                      ),
-                      const SizedBox(height: 14),
-                      _LegendItem(
-                        color: const Color(0xFFC8C4F8),
-                        title: "Carbs",
-                        value: "${mealPlan.carbsG}g",
+                      const Text(
+                        "kcal",
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.black54,
+                        ),
                       ),
                     ],
                   ),
                 ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            flex: 4,
+            child: Column(
+              children: [
+                _LegendItem(
+                  color: const Color(0xFFFFC98B),
+                  title: "Protein",
+                  value: "${protein.toStringAsFixed(0)}g",
+                ),
+                const SizedBox(height: 14),
+                _LegendItem(
+                  color: const Color(0xFFC8C4F8),
+                  title: "Carbs",
+                  value: "${carbs.toStringAsFixed(0)}g",
+                ),
+                const SizedBox(height: 14),
+                _LegendItem(
+                  color: const Color(0xFFF6B7C3),
+                  title: "Fats",
+                  value: "${fats.toStringAsFixed(0)}g",
+                ),
               ],
             ),
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFE4CF),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.local_fire_department_rounded,
-                  color: Color(0xFFF29D72),
-                  size: 22,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  "$consumedCalories / $calorieGoal kcal",
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF262626),
-                  ),
-                ),
-              ),
-              Text(
-                "${remaining > 0 ? remaining : 0} left",
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black54,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                flex: 5,
-                child: SizedBox(
-                  height: 180,
-                  child: CustomPaint(
-                    painter: const MacroRingPainter(),
-                    child: Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Text(
-                            "Consumed",
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.black54,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            "$consumedCalories",
-                            style: const TextStyle(
-                              fontSize: 34,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF262626),
-                            ),
-                          ),
-                          const Text(
-                            "kcal",
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.black54,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                flex: 4,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _LegendItem(
-                      color: const Color(0xFFF6B7C3),
-                      title: "Fat",
-                      value: "${fat.toStringAsFixed(0)}/${fatGoal}g",
-                    ),
-                    const SizedBox(height: 14),
-                    _LegendItem(
-                      color: const Color(0xFFFFC98B),
-                      title: "Protein",
-                      value: "${protein.toStringAsFixed(0)}/${proteinGoal}g",
-                    ),
-                    const SizedBox(height: 14),
-                    _LegendItem(
-                      color: const Color(0xFFC8C4F8),
-                      title: "Carbs",
-                      value: "${carbs.toStringAsFixed(0)}/${carbsGoal}g",
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              const Icon(
-                Icons.track_changes_rounded,
-                color: Color(0xFFF29D72),
-              ),
-              const SizedBox(width: 10),
-              const Text(
-                "Today's Goal",
-                style: TextStyle(
-                  fontSize: 18,
-                  color: Colors.black54,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                "${mealPlan.totalCalories} kcal",
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFFF29D72),
-                ),
-              ),
-            ],
           ),
         ],
       ),
@@ -847,9 +623,8 @@ class _MealCard extends StatelessWidget {
                 child: Text(
                   title,
                   style: const TextStyle(
-                    fontSize: 26,
+                    fontSize: 24,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF262626),
                   ),
                 ),
               ),
@@ -867,28 +642,42 @@ class _MealCard extends StatelessWidget {
 }
 
 class MacroRingPainter extends CustomPainter {
-  const MacroRingPainter();
+  final double protein;
+  final double carbs;
+  final double fats;
+
+  MacroRingPainter(
+    this.protein,
+    this.carbs,
+    this.fats,
+  );
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     const strokeWidth = 14.0;
-    final radius = (size.width / 2) - 16;
+    final radius = (size.shortestSide / 2) - 12;
 
     final basePaint = Paint()
-      ..color = const Color(0xFFF0EAE4)
+      ..color = const Color(0xFFEFEAE5)
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round;
 
     canvas.drawCircle(center, radius, basePaint);
 
-    void drawArc(Color color, double start, double sweep) {
+    double start = -1.5708;
+
+    void drawArc(double percent, Color color) {
+      if (percent <= 0) return;
+
       final paint = Paint()
         ..color = color
         ..style = PaintingStyle.stroke
         ..strokeWidth = strokeWidth
         ..strokeCap = StrokeCap.round;
+
+      final sweep = 6.28318 * percent;
 
       canvas.drawArc(
         Rect.fromCircle(center: center, radius: radius),
@@ -897,13 +686,19 @@ class MacroRingPainter extends CustomPainter {
         false,
         paint,
       );
+
+      start += sweep;
     }
 
-    drawArc(const Color(0xFFFFC98B), 2.75, 1.05);
-    drawArc(const Color(0xFFF6B7C3), 3.95, 1.2);
-    drawArc(const Color(0xFFC8C4F8), 5.35, 1.15);
+    drawArc(protein, const Color(0xFFFFC98B));
+    drawArc(carbs, const Color(0xFFC8C4F8));
+    drawArc(fats, const Color(0xFFF6B7C3));
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant MacroRingPainter oldDelegate) {
+    return oldDelegate.protein != protein ||
+        oldDelegate.carbs != carbs ||
+        oldDelegate.fats != fats;
+  }
 }

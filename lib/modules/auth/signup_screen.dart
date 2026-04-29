@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+
 import '../../widgets/app_background.dart';
 import '../diet/multi_parameter_form.dart';
+import 'auth_service.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -18,8 +20,11 @@ class _SignupScreenState extends State<SignupScreen> {
   final passwordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
 
+  final AuthService authService = AuthService();
+
   bool isPasswordHidden = true;
   bool isConfirmPasswordHidden = true;
+  bool isLoading = false;
 
   @override
   void dispose() {
@@ -55,17 +60,40 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 
-  void _handleSignup() {
+  Future<void> _handleSignup() async {
     if (!_formKey.currentState!.validate()) return;
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-       builder: (_) => MultiParameterForm(
-  name: nameController.text.trim(),
-),
-      ),
-    );
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      await authService.signUpWithEmail(
+        emailController.text.trim(),
+        passwordController.text.trim(),
+      );
+
+      if (!mounted) return;
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const MultiParameterForm(),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Signup failed: $e")),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -232,21 +260,30 @@ class _SignupScreenState extends State<SignupScreen> {
                         width: double.infinity,
                         height: 54,
                         child: ElevatedButton(
-                          onPressed: _handleSignup,
+                          onPressed: isLoading ? null : _handleSignup,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFFF29D72),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(20),
                             ),
                           ),
-                          child: const Text(
-                            "Sign Up",
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                          ),
+                          child: isLoading
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text(
+                                  "Sign Up",
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
                         ),
                       )
                     ],

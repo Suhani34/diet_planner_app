@@ -5,7 +5,6 @@ import '../../widgets/bmi_summary_card.dart';
 import '../dashboard/dashboard_screen.dart';
 import 'meal_plan.dart';
 
-/// नया user फॉर्म पूरा करने के बाद पहले यहाँ आता है — BMI दिखता है, फिर dashboard।
 class BmiResultScreen extends StatelessWidget {
   final MealPlan mealPlan;
   final double heightCm;
@@ -73,7 +72,6 @@ class BmiResultScreen extends StatelessWidget {
                         context,
                         MaterialPageRoute(
                           builder: (_) => DashboardScreen(
-                            mealPlan: mealPlan,
                             isPlanLocked: true,
                             heightCm: heightCm,
                             weightKg: weightKg,

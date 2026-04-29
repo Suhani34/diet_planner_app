@@ -19,7 +19,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  final TextEditingController usernameController = TextEditingController();
+  final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
 
   final AuthService authService = AuthService();
@@ -29,22 +29,28 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
-    usernameController.dispose();
+    emailController.dispose();
     passwordController.dispose();
     super.dispose();
   }
 
-  Future<void> _redirectAfterSocialLogin(UserCredential credential) async {
-    final user = credential.user;
-
-    if (user == null) return;
-
+  Future<void> _handleRedirect(User user) async {
     try {
       final bool profileComplete = await ApiService.isProfileComplete(user.uid);
 
       if (!mounted) return;
 
-      if (profileComplete) {
+      if (!profileComplete) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const MultiParameterForm(),
+          ),
+        );
+        return;
+      }
+
+      try {
         final mealPlanJson = await ApiService.getLatestMealPlan(user.uid);
         final mealPlan = MealPlanModel.fromJson(mealPlanJson);
 
@@ -56,15 +62,21 @@ class _LoginScreenState extends State<LoginScreen> {
             builder: (_) => DashboardScreen(mealPlan: mealPlan),
           ),
         );
-      } else {
+      } catch (e) {
+        debugPrint("Latest meal fetch failed: $e");
+
+        if (!mounted) return;
+
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (_) => const MultiParameterForm(),
+            builder: (_) => const DashboardScreen(mealPlan: null),
           ),
         );
       }
     } catch (e) {
+      debugPrint("Profile status check failed: $e");
+
       if (!mounted) return;
 
       Navigator.pushReplacement(
@@ -79,186 +91,110 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      isLoading = true;
-    });
+    setState(() => isLoading = true);
 
     try {
       final credential = await authService.loginWithEmail(
-        usernameController.text.trim(),
+        emailController.text.trim(),
         passwordController.text.trim(),
       );
 
       final user = credential.user;
+      if (user == null) throw Exception("User not found");
 
-      if (user == null) {
-        throw Exception("User not found");
-      }
-
-      final bool profileComplete = await ApiService.isProfileComplete(user.uid);
-
-      if (!mounted) return;
-
-      if (profileComplete) {
-        final mealPlanJson = await ApiService.getLatestMealPlan(user.uid);
-        final mealPlan = MealPlanModel.fromJson(mealPlanJson);
-
-        if (!mounted) return;
-
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => DashboardScreen(mealPlan: mealPlan),
-          ),
-        );
-      } else {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => const MultiParameterForm(),
-          ),
-        );
-      }
+      await _handleRedirect(user);
     } catch (e) {
-      debugPrint("Email login error: $e");
-
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Login failed: $e"),
-        ),
+        SnackBar(content: Text("Login failed: $e")),
       );
     } finally {
-      if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
-      }
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
   Future<void> _handleGoogleLogin() async {
-    setState(() {
-      isLoading = true;
-    });
+    setState(() => isLoading = true);
 
     try {
       final credential = await authService.loginWithGoogle();
 
-      if (!mounted) return;
+      final user = credential.user;
+      if (user == null) throw Exception("Google user not found");
 
-      await _redirectAfterSocialLogin(credential);
-    } catch (e, st) {
-      debugPrint("Google login error: $e");
-      debugPrint("Google login stack: $st");
-
+      await _handleRedirect(user);
+    } catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Google login failed: $e"),
-        ),
+        SnackBar(content: Text("Google login failed: $e")),
       );
     } finally {
-      if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
-      }
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
   Future<void> _handleFacebookLogin() async {
-    setState(() {
-      isLoading = true;
-    });
+    setState(() => isLoading = true);
 
     try {
       final credential = await authService.loginWithFacebook();
 
-      if (!mounted) return;
+      final user = credential.user;
+      if (user == null) throw Exception("Facebook user not found");
 
-      await _redirectAfterSocialLogin(credential);
-    } catch (e, st) {
-      debugPrint("Facebook login error: $e");
-      debugPrint("Facebook login stack: $st");
-
+      await _handleRedirect(user);
+    } catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Facebook login failed: $e"),
-        ),
+        SnackBar(content: Text("Facebook login failed: $e")),
       );
     } finally {
-      if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
-      }
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
   Future<void> _handleXLogin() async {
-    setState(() {
-      isLoading = true;
-    });
+    setState(() => isLoading = true);
 
     try {
       final credential = await authService.loginWithX();
 
-      if (!mounted) return;
+      final user = credential.user;
+      if (user == null) throw Exception("X user not found");
 
-      await _redirectAfterSocialLogin(credential);
-    } catch (e, st) {
-      debugPrint("X login error: $e");
-      debugPrint("X login stack: $st");
-
+      await _handleRedirect(user);
+    } catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("X login failed: $e"),
-        ),
+        SnackBar(content: Text("X login failed: $e")),
       );
     } finally {
-      if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
-      }
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
   Future<void> _handleMicrosoftLogin() async {
-    setState(() {
-      isLoading = true;
-    });
+    setState(() => isLoading = true);
 
     try {
       final credential = await authService.loginWithMicrosoft();
 
-      if (!mounted) return;
+      final user = credential.user;
+      if (user == null) throw Exception("Microsoft user not found");
 
-      await _redirectAfterSocialLogin(credential);
-    } catch (e, st) {
-      debugPrint("Microsoft login error: $e");
-      debugPrint("Microsoft login stack: $st");
-
+      await _handleRedirect(user);
+    } catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Microsoft login failed: $e"),
-        ),
+        SnackBar(content: Text("Microsoft login failed: $e")),
       );
     } finally {
-      if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
-      }
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
@@ -281,27 +217,32 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _socialButton(String imagePath) {
-    return Container(
-      width: 54,
-      height: 54,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+  Widget _socialButton({
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: isLoading ? null : onTap,
+      child: Container(
+        width: 54,
+        height: 54,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Center(
+          child: Icon(
+            icon,
+            size: 28,
+            color: Colors.black87,
           ),
-        ],
-      ),
-      child: Center(
-        child: Image.asset(
-          imagePath,
-          width: 24,
-          height: 24,
-          errorBuilder: (_, __, ___) => const Icon(Icons.image_not_supported),
         ),
       ),
     );
@@ -361,7 +302,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 24),
                     TextFormField(
-                      controller: usernameController,
+                      controller: emailController,
                       keyboardType: TextInputType.emailAddress,
                       decoration: _inputDecoration(
                         label: "Email",
@@ -440,7 +381,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 10),
                     TextButton(
-                      onPressed: () {},
+                      onPressed: isLoading ? null : () {},
                       child: const Text(
                         "Forgot Password?",
                         style: TextStyle(color: Colors.black87),
@@ -455,34 +396,36 @@ class _LoginScreenState extends State<LoginScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
-                        GestureDetector(
-                          onTap: isLoading ? null : _handleGoogleLogin,
-                          child: _socialButton("assets/images/google.png"),
+                        _socialButton(
+                          icon: Icons.g_mobiledata_rounded,
+                          onTap: _handleGoogleLogin,
                         ),
-                        GestureDetector(
-                          onTap: isLoading ? null : _handleFacebookLogin,
-                          child: _socialButton("assets/images/facebook.png"),
+                        _socialButton(
+                          icon: Icons.facebook_rounded,
+                          onTap: _handleFacebookLogin,
                         ),
-                        GestureDetector(
-                          onTap: isLoading ? null : _handleXLogin,
-                          child: _socialButton("assets/images/x.png"),
+                        _socialButton(
+                          icon: Icons.alternate_email_rounded,
+                          onTap: _handleXLogin,
                         ),
-                        GestureDetector(
-                          onTap: isLoading ? null : _handleMicrosoftLogin,
-                          child: _socialButton("assets/images/microsoft.png"),
+                        _socialButton(
+                          icon: Icons.business_rounded,
+                          onTap: _handleMicrosoftLogin,
                         ),
                       ],
                     ),
                     const SizedBox(height: 22),
                     TextButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const SignupScreen(),
-                          ),
-                        );
-                      },
+                      onPressed: isLoading
+                          ? null
+                          : () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const SignupScreen(),
+                                ),
+                              );
+                            },
                       child: const Text(
                         "Don't have an account? Create New Account",
                         textAlign: TextAlign.center,
