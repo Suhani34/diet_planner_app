@@ -6,8 +6,6 @@ import '../../services/api_service.dart';
 import '../../widgets/app_background.dart';
 import '../../widgets/ruler_scale_picker.dart';
 import '../dashboard/dashboard_screen.dart';
-import 'bmi_result_screen.dart';
-import 'meal_plan_service.dart';
 
 class MultiParameterForm extends StatefulWidget {
   const MultiParameterForm({super.key});
@@ -18,7 +16,6 @@ class MultiParameterForm extends StatefulWidget {
 
 class _MultiParameterFormState extends State<MultiParameterForm> {
   final PageController _controller = PageController();
-  final MealPlanService _mealPlanService = MealPlanService();
 
   int currentPage = 0;
 
@@ -140,14 +137,49 @@ class _MultiParameterFormState extends State<MultiParameterForm> {
 
   Future<void> _handleContinue() async {
     if (currentPage >= 12) {
+      // Last page - submit profile and generate AI meals
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("User not logged in")),
+        );
+        return;
+      }
+
       setState(() {
         _isGeneratingPlan = true;
       });
 
       try {
-        final result = await _mealPlanService.generateOrGetLockedPlan(
-          profileParams: _buildProfilePayload(),
-        );
+        final heightValue = double.tryParse(height) ?? 160.0;
+        final weightValue = double.tryParse(weight) ?? 60.0;
+
+        // Prepare profile payload with firebase_uid for backend
+        final profilePayload = {
+          "firebase_uid": user.uid,
+          "email": user.email,
+          "full_name": user.displayName,
+          "age": int.tryParse(age),
+          "gender": gender,
+          "height": heightValue,
+          "weight": weightValue,
+          "goal": goal,
+          "activity_level": activityLevel,
+          "diet_preference": dietPreference,
+          "meal_frequency": mealFrequency,
+          "timeline": timeline,
+          "budget": budget,
+          "cuisine": cuisine,
+          "allergies": allergies,
+          "medical_conditions": medicalConditions,
+          "profile_complete": true,
+        };
+
+        // Step 1: Save profile to backend
+        await ApiService.saveProfile(profilePayload);
+
+        // Step 2: Generate meal plan via AI
+        final mealJson = await ApiService.generateMealPlan(user.uid);
 
         if (!mounted) return;
 
@@ -155,16 +187,15 @@ class _MultiParameterFormState extends State<MultiParameterForm> {
           _isGeneratingPlan = false;
         });
 
-        final heightCm = double.tryParse(height) ?? 160.0;
-        final weightKg = double.tryParse(weight) ?? 60.0;
-
+        // Step 3: Navigate to dashboard with generated meal
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (_) => BmiResultScreen(
-              mealPlan: result.plan,
-              heightCm: heightCm,
-              weightKg: weightKg,
+            builder: (_) => DashboardScreen(
+              mealPlan: MealPlanModel.fromJson(mealJson),
+              heightCm: heightValue,
+              weightKg: weightValue,
+              isPlanLocked: true,
             ),
           ),
         );
@@ -175,8 +206,9 @@ class _MultiParameterFormState extends State<MultiParameterForm> {
           _isGeneratingPlan = false;
         });
 
+        debugPrint("API Error: $e");
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Plan generation failed: $e")),
+          SnackBar(content: Text("Failed: $e")),
         );
       }
     } else {
@@ -736,7 +768,7 @@ class _MultiParameterFormState extends State<MultiParameterForm> {
     );
   }
 
-  Widget _buildLegacyLockedPlanFlow() {
+  Widget buildLegacyLockedPlanFlow() {
     return AppBackground(
       child: Column(
         children: [

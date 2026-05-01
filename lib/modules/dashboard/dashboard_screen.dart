@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/meal_plan_model.dart';
 import '../../services/api_service.dart';
 import '../../widgets/app_background.dart';
+import '../../widgets/bmi_summary_card.dart';
 import '../auth/auth_service.dart';
 import '../auth/login_screen.dart';
 import '../diet/food_item.dart';
@@ -273,6 +274,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final fats = mealPlan?.fatsG.toDouble() ??
         allFoods.fold<double>(0, (sum, food) => sum + food.fat);
 
+    // Calculate BMI if height and weight are available
+    double? bmi;
+    String? bmiStatus;
+    if (widget.heightCm != null && widget.weightKg != null) {
+      final hM = widget.heightCm! / 100.0;
+      bmi = widget.weightKg! / (hM * hM);
+      bmiStatus = BmiSummaryCard.labelFor(bmi);
+    }
+
     return Scaffold(
       body: AppBackground(
         child: SafeArea(
@@ -324,6 +334,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ],
                 const SizedBox(height: 16),
+                if (bmi != null && bmiStatus != null) ...[
+                  BmiSummaryCard(
+                    bmi: bmi,
+                    status: bmiStatus,
+                    compact: true,
+                  ),
+                  const SizedBox(height: 16),
+                ],
                 _MacroCard(
                   calories: calories,
                   protein: protein,
