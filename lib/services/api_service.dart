@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 class ApiService {
   // 🔥 Smart IP config: Using ADB Reverse so 127.0.0.1 works on USB too!
   static String get baseUrl {
-    return "http://192.168.29.251:8000/api";
+    return "http://127.0.0.1:8000/api";
   }
 
   static const Duration shortTimeout = Duration(seconds: 15);
@@ -45,6 +45,21 @@ class ApiService {
     }
 
     throw Exception("Failed to save profile: ${response.body}");
+  }
+
+  static Future<Map<String, dynamic>> getProfile(String firebaseUid) async {
+    final response = await http.get(
+      Uri.parse("$baseUrl/users/profile/$firebaseUid/"),
+      headers: {"Content-Type": "application/json"},
+    ).timeout(shortTimeout);
+
+    print("GET PROFILE STATUS: ${response.statusCode}");
+
+    if (response.statusCode == 200) {
+      return _unwrap(_asMap(response.body));
+    }
+
+    throw Exception("Failed to fetch profile: ${response.body}");
   }
 
   // ---------------- GENERATE MEAL ----------------

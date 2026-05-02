@@ -9,6 +9,7 @@ import '../auth/auth_service.dart';
 import '../auth/login_screen.dart';
 import '../diet/food_item.dart';
 import '../diet/meal_detail_screen.dart';
+import '../profile/profile_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final MealPlanModel? mealPlan;
@@ -248,6 +249,51 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }).toList();
   }
 
+  void _openProfile() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final profileData = await ApiService.getProfile(user.uid);
+      if (!mounted) return;
+      Navigator.pop(context); // close dialog
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ProfileScreen(
+            name: user.displayName ?? "User",
+            age: profileData["age"]?.toString() ?? "25",
+            gender: profileData["gender"] ?? "Male",
+            height: profileData["height_cm"]?.toString() ?? "170",
+            weight: profileData["weight_kg"]?.toString() ?? "70",
+            goal: profileData["goal"] ?? "Maintain Weight",
+            activity: profileData["activity_level"] ?? "Sedentary",
+            diet: profileData["dietary_preference"] ?? "Vegetarian",
+            meals: profileData["meals_per_day"]?.toString() ?? "3",
+            timeline: profileData["timeline"] ?? "1 Month",
+            budget: profileData["budget"] ?? "Medium",
+            cuisine: profileData["cuisine_preference"] ?? "Indian",
+            allergies: List<String>.from(profileData["allergies"] ?? []),
+            conditions: List<String>.from(profileData["medical_conditions"] ?? []),
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context); // close dialog
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Could not load profile: $e")),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
@@ -309,6 +355,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   name: user?.displayName ?? "User",
                   email: user?.email ?? "Signed in",
                   onLogout: _handleLogout,
+                  onProfileTap: _openProfile,
                 ),
                 const SizedBox(height: 18),
                 const Text(
@@ -404,22 +451,27 @@ class _TopBar extends StatelessWidget {
   final String name;
   final String email;
   final VoidCallback onLogout;
+  final VoidCallback onProfileTap;
 
   const _TopBar({
     required this.name,
     required this.email,
     required this.onLogout,
+    required this.onProfileTap,
   });
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        const CircleAvatar(
-          backgroundColor: Color(0xFFFFE9DA),
-          child: Icon(
-            Icons.person_rounded,
-            color: Color(0xFFF29D72),
+        GestureDetector(
+          onTap: onProfileTap,
+          child: const CircleAvatar(
+            backgroundColor: Color(0xFFFFE9DA),
+            child: Icon(
+              Icons.person_rounded,
+              color: Color(0xFFF29D72),
+            ),
           ),
         ),
         const SizedBox(width: 10),
