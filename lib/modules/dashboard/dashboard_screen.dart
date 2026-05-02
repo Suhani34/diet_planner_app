@@ -148,14 +148,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   String _formatMealTitle(String key) {
-    return key
-        .replaceAll("_", " ")
-        .split(" ")
-        .map((word) {
-          if (word.isEmpty) return word;
-          return word[0].toUpperCase() + word.substring(1);
-        })
-        .join(" ");
+    return key.replaceAll("_", " ").split(" ").map((word) {
+      if (word.isEmpty) return word;
+      return word[0].toUpperCase() + word.substring(1);
+    }).join(" ");
   }
 
   List<FoodItem> _convertMealItems(List<dynamic> items) {

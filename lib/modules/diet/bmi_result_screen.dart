@@ -1,18 +1,15 @@
+//bmi_result_screen.dart
 import 'package:flutter/material.dart';
-
 import '../../widgets/app_background.dart';
 import '../../widgets/bmi_summary_card.dart';
 import '../dashboard/dashboard_screen.dart';
-import 'meal_plan.dart';
 
 class BmiResultScreen extends StatelessWidget {
-  final MealPlan mealPlan;
   final double heightCm;
   final double weightKg;
 
   const BmiResultScreen({
     super.key,
-    required this.mealPlan,
     required this.heightCm,
     required this.weightKg,
   });

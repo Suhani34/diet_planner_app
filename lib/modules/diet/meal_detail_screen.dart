@@ -1,5 +1,5 @@
+//meal_detail_screen.dart
 import 'package:flutter/material.dart';
-
 import '../../widgets/app_background.dart';
 import 'food_detail_screen.dart';
 import 'food_item.dart';

@@ -1,3 +1,4 @@
+//meal_plan_model.dart
 class MealItem {
   final String name;
   final num calories;

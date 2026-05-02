@@ -1,3 +1,4 @@
+//food_item.dart
 class FoodItem {
   final String name;
   final int calories;

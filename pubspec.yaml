@@ -12,41 +12,41 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # ── Icons ──────────────────────────────────────────────
+  # ── Icons ─────────────────────────
   cupertino_icons: ^1.0.9
 
-  # ── State Management ───────────────────────────────────
+  # ── State Management ─────────────
   provider: ^6.1.5
 
-  # ── Navigation ─────────────────────────────────────────
+  # ── Navigation ───────────────────
   go_router: ^17.1.0
 
-  # ── Authentication (Login Screen) ──────────────────────
+  # ── Authentication ──────────────
   firebase_core: ^4.6.0
   firebase_auth: ^6.3.0
   google_sign_in: ^7.2.0
   flutter_facebook_auth: ^7.1.6
 
-  # ── Backend / API ──────────────────────────────────────
+  # ── Backend / API ───────────────
   http: ^1.6.0
   dio: ^5.9.2
 
-  # ── Local Storage ──────────────────────────────────────
+  # ── Local Storage ───────────────
   shared_preferences: ^2.5.5
   flutter_secure_storage: ^10.0.0
 
-  # ── UI Components (Dashboard) ──────────────────────────
+  # ── UI Components ───────────────
   fl_chart: ^1.2.0
   percent_indicator: ^4.2.5
   cached_network_image: ^3.4.1
   shimmer: ^3.0.0
   lottie: ^3.3.2
 
-  # ── Forms & Validation ────────────────────────────────
+  # ── Forms ───────────────────────
   flutter_form_builder: ^10.3.0
   form_builder_validators: ^11.3.0
 
-  # ── Utilities ─────────────────────────────────────────
+  # ── Utilities ───────────────────
   intl: ^0.20.2
   image_picker: ^1.2.1
   connectivity_plus: ^7.0.0
@@ -54,7 +54,6 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-
   flutter_lints: ^6.0.0
 
 flutter:

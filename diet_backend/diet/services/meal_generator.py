@@ -31,7 +31,6 @@ def _extract_text_from_completion(completion):
     except Exception:
         raise ValueError(f"Unexpected AI response shape: {completion}")
 
-    # Normal successful chat-completion text
     try:
         content = choice.message.content
         if isinstance(content, str) and content.strip():
@@ -39,17 +38,47 @@ def _extract_text_from_completion(completion):
     except Exception:
         pass
 
-    # If model stopped because of length and never produced final content
-    finish_reason = getattr(choice, "finish_reason", None)
-    reasoning = getattr(choice.message, "reasoning", None) if getattr(choice, "message", None) else None
+    raise ValueError(f"No valid text found in AI response: {completion}")
 
-    if reasoning and finish_reason == "length":
-        raise ValueError(
-            "Model used all output tokens while reasoning and did not return final JSON. "
-            "Use a different model or increase token budget."
-        )
 
-    raise ValueError(f"No text content found in AI response: {completion}")
+def _fallback_meal_plan():
+    return {
+        "day_number": 1,
+        "total_calories": 1800,
+        "protein_g": 90,
+        "carbs_g": 220,
+        "fats_g": 55,
+        "meals": {
+            "breakfast": [
+                {
+                    "name": "Oats with Milk",
+                    "calories": 300,
+                    "protein_g": 10,
+                    "carbs_g": 40,
+                    "fats_g": 8
+                }
+            ],
+            "lunch": [
+                {
+                    "name": "Rice and Dal",
+                    "calories": 500,
+                    "protein_g": 20,
+                    "carbs_g": 70,
+                    "fats_g": 10
+                }
+            ],
+            "dinner": [
+                {
+                    "name": "Chapati with Sabzi",
+                    "calories": 400,
+                    "protein_g": 15,
+                    "carbs_g": 50,
+                    "fats_g": 12
+                }
+            ]
+        },
+        "raw_ai_response": "fallback_used"
+    }
 
 
 def generate_ai_meal_plan(profile):
@@ -74,100 +103,84 @@ def generate_ai_meal_plan(profile):
 
     prompt = f"""
 Generate a realistic 1-day diet plan for this user.
-Return ONLY valid JSON. No markdown. No explanation.
+Return ONLY valid JSON.
 
-User profile:
-- Age: {profile.age}
-- Gender: {profile.gender}
-- Height: {profile.height} cm
-- Weight: {profile.weight} kg
-- Goal: {profile.goal}
-- Activity level: {profile.activity_level}
-- Diet preference: {profile.diet_preference}
-- Meal frequency: {profile.meal_frequency}
-- Timeline: {profile.timeline}
-- Budget: {profile.budget}
-- Cuisine: {profile.cuisine}
-- Allergies: {profile.allergies}
-- Medical conditions: {profile.medical_conditions}
+User:
+Age: {profile.age}
+Gender: {profile.gender}
+Height: {profile.height}
+Weight: {profile.weight}
+Goal: {profile.goal}
+Activity: {profile.activity_level}
+Diet: {profile.diet_preference}
+Meals: {profile.meal_frequency}
 
 Rules:
-1. Meals must match the user's diet preference, cuisine, allergies, medical conditions, and budget.
-2. {meal_rule}
-3. Each meal must contain one or more food items.
-4. Each food item must have:
-   - name
-   - calories
-   - protein_g
-   - carbs_g
-   - fats_g
-5. Include total daily calories and total macros.
-6. Keep meals practical and affordable.
-7. Return ONLY valid JSON in this exact structure:
+- {meal_rule}
+- Include calories + macros
+- Return only JSON
 
+Structure:
 {{
   "day_number": 1,
   "total_calories": 1800,
   "protein_g": 90,
   "carbs_g": 220,
   "fats_g": 55,
-  "meals": {{
-    "breakfast": [
-      {{
-        "name": "example food",
-        "calories": 300,
-        "protein_g": 10,
-        "carbs_g": 40,
-        "fats_g": 8
-      }}
-    ]
-  }}
+  "meals": {{}}
 }}
 """
 
-    completion = client.chat.completions.create(
-        model=model_name,
-        messages=[
-            {
-                "role": "system",
-                "content": "You are a diet planner. Return only valid JSON."
-            },
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ],
-        max_tokens=800,
-        temperature=0.3,
-    )
-
-    raw_text = _extract_text_from_completion(completion)
-    cleaned_text = _clean_json_text(raw_text)
-
     try:
-        parsed = json.loads(cleaned_text)
-    except Exception:
-        raise ValueError(f"Invalid JSON from Hugging Face model: {raw_text}")
+        completion = client.chat.completions.create(
+            model=model_name,
+            messages=[
+                {"role": "system", "content": "Return only JSON"},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=400,
+            temperature=0.3,
+        )
 
-    required_top_keys = [
-        "day_number",
-        "total_calories",
-        "protein_g",
-        "carbs_g",
-        "fats_g",
-        "meals",
-    ]
+        raw_text = _extract_text_from_completion(completion)
+        cleaned_text = _clean_json_text(raw_text)
 
-    for key in required_top_keys:
-        if key not in parsed:
-            raise ValueError(f"Missing required key in AI response: {key}")
+        try:
+            parsed = json.loads(cleaned_text)
+        except Exception as e:
+            print("⚠️ JSON parse failed → fallback", e)
+            return _fallback_meal_plan()
 
-    return {
-        "day_number": int(parsed["day_number"]),
-        "total_calories": int(parsed["total_calories"]),
-        "protein_g": float(parsed["protein_g"]),
-        "carbs_g": float(parsed["carbs_g"]),
-        "fats_g": float(parsed["fats_g"]),
-        "meals": parsed["meals"],
-        "raw_ai_response": raw_text,
-    }
+        # required keys check
+        required_keys = [
+            "day_number",
+            "total_calories",
+            "protein_g",
+            "carbs_g",
+            "fats_g",
+            "meals",
+        ]
+
+        for key in required_keys:
+            if key not in parsed:
+                print(f"⚠️ Missing {key} → fallback")
+                return _fallback_meal_plan()
+
+        # safe conversion
+        try:
+            return {
+                "day_number": int(parsed["day_number"]),
+                "total_calories": int(parsed["total_calories"]),
+                "protein_g": float(parsed["protein_g"]),
+                "carbs_g": float(parsed["carbs_g"]),
+                "fats_g": float(parsed["fats_g"]),
+                "meals": parsed["meals"],
+                "raw_ai_response": raw_text,
+            }
+        except Exception as e:
+            print("⚠️ Final conversion failed → fallback", e)
+            return _fallback_meal_plan()
+
+    except Exception as e:
+        print("❌ AI call failed → fallback", e)
+        return _fallback_meal_plan()

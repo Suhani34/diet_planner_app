@@ -1,3 +1,4 @@
+//bmi_summary_card.dart
 import 'package:flutter/material.dart';
 
 /// Shared BMI card UI — dashboard और onboarding result दोनों में use हो सकता है।

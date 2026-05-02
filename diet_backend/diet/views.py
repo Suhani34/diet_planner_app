@@ -18,6 +18,7 @@ def generate_meal_plan(request):
             status=status.HTTP_400_BAD_REQUEST
         )
 
+    # 🔹 STEP 1: Profile check
     try:
         profile = UserProfile.objects.get(firebase_uid=firebase_uid)
     except UserProfile.DoesNotExist:
@@ -26,14 +27,27 @@ def generate_meal_plan(request):
             status=status.HTTP_404_NOT_FOUND
         )
 
+    # 🔥 STEP 2: Check if meal already exists (FAST RETURN)
+    existing = MealPlan.objects.filter(firebase_uid=firebase_uid)\
+        .order_by('-created_at')\
+        .first()
+
+    if existing:
+        serializer = MealPlanSerializer(existing)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    # 🔥 STEP 3: Generate meal using AI
     try:
+        print("🔄 Generating AI meal...")
         generated = generate_ai_meal_plan(profile)
+        print("✅ AI meal generated")
     except Exception as e:
         return Response(
             {'error': f'AI generation failed: {str(e)}'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
+    # 🔹 STEP 4: Save to DB
     meal_plan = MealPlan.objects.create(
         firebase_uid=firebase_uid,
         day_number=generated['day_number'],
@@ -45,13 +59,16 @@ def generate_meal_plan(request):
         raw_ai_response=generated['raw_ai_response'],
     )
 
+    # 🔹 STEP 5: Return response
     serializer = MealPlanSerializer(meal_plan)
     return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 @api_view(['GET'])
 def get_latest_meal_plan(request, firebase_uid):
-    meal_plan = MealPlan.objects.filter(firebase_uid=firebase_uid).order_by('-created_at').first()
+    meal_plan = MealPlan.objects.filter(firebase_uid=firebase_uid)\
+        .order_by('-created_at')\
+        .first()
 
     if not meal_plan:
         return Response(

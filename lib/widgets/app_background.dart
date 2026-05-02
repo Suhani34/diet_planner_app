@@ -1,3 +1,4 @@
+//app_background.dart
 import 'package:flutter/material.dart';
 
 class AppBackground extends StatelessWidget {
