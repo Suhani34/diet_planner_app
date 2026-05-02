@@ -2,8 +2,10 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ApiService {
-  // 🔥 IMPORTANT: अपना laptop IP डालो (same WiFi)
-  static const String baseUrl = "http://192.168.31.156:8000/api";
+  // 🔥 Smart IP config: Using ADB Reverse so 127.0.0.1 works on USB too!
+  static String get baseUrl {
+    return "http://192.168.29.251:8000/api";
+  }
 
   static const Duration shortTimeout = Duration(seconds: 15);
   static const Duration aiTimeout = Duration(seconds: 90);
@@ -29,7 +31,7 @@ class ApiService {
       Map<String, dynamic> data) async {
     final response = await http
         .post(
-          Uri.parse("$baseUrl/profile/"),
+          Uri.parse("$baseUrl/users/profile/"),
           headers: {"Content-Type": "application/json"},
           body: jsonEncode(data),
         )
@@ -90,7 +92,7 @@ class ApiService {
 
   static Future<bool> isProfileComplete(String firebaseUid) async {
     final response = await http.get(
-      Uri.parse("$baseUrl/profile/$firebaseUid/status/"),
+      Uri.parse("$baseUrl/users/profile/$firebaseUid/status/"),
       headers: {"Content-Type": "application/json"},
     ).timeout(shortTimeout);
     print("PROFILE STATUS: ${response.statusCode}");

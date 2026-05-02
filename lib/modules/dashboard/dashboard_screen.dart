@@ -280,6 +280,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     return Scaffold(
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: isLoadingMeal ? null : _saveAndGenerateMeal,
+        backgroundColor: const Color(0xFFF29D72),
+        icon: isLoadingMeal
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
+                ),
+              )
+            : const Icon(Icons.auto_awesome_rounded, color: Colors.white),
+        label: const Text(
+          "Generate AI Meal",
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+      ),
       body: AppBackground(
         child: SafeArea(
           child: Padding(

@@ -438,8 +438,8 @@ class _MultiParameterFormState extends State<MultiParameterForm> {
         });
       },
       child: Container(
-        width: 92,
-        padding: const EdgeInsets.all(18),
+        width: 85,
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: isSelected ? color.withOpacity(0.16) : Colors.white,
           borderRadius: BorderRadius.circular(20),
