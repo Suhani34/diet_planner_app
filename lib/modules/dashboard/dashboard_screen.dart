@@ -37,16 +37,40 @@ class _DashboardScreenState extends State<DashboardScreen> {
   MealPlanModel? mealPlan;
   bool isLoadingMeal = false;
   String? mealError;
+  double? currentHeight;
+  double? currentWeight;
 
   @override
   void initState() {
     super.initState();
     mealPlan = widget.mealPlan;
+    currentHeight = widget.heightCm;
+    currentWeight = widget.weightKg;
 
-    if (widget.shouldGenerateMeal) {
-      _saveAndGenerateMeal();
-    } else if (mealPlan == null) {
-      _loadLatestMeal();
+    _fetchProfileAndData();
+  }
+
+  Future<void> _fetchProfileAndData() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      // Load profile to get height/weight for BMI
+      final profile = await ApiService.getProfile(user.uid);
+      if (mounted) {
+        setState(() {
+          currentHeight = double.tryParse(profile["height_cm"]?.toString() ?? "") ?? currentHeight;
+          currentWeight = double.tryParse(profile["weight_kg"]?.toString() ?? "") ?? currentWeight;
+        });
+      }
+
+      if (widget.shouldGenerateMeal) {
+        _saveAndGenerateMeal();
+      } else if (mealPlan == null) {
+        _loadLatestMeal();
+      }
+    } catch (e) {
+      debugPrint("Profile fetch failed: $e");
     }
   }
 
@@ -78,7 +102,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (!mounted) return;
 
       setState(() {
-        mealError = "AI meal generation failed. Showing default dashboard.";
+        mealError = "AI generation error. Please try again.";
         isLoadingMeal = false;
       });
     }
@@ -108,7 +132,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (!mounted) return;
 
       setState(() {
-        mealError = "No AI meal loaded yet.";
+        mealError = null;
         isLoadingMeal = false;
       });
     }
@@ -116,9 +140,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _handleLogout() async {
     await AuthService().logout();
-
     if (!mounted) return;
-
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (_) => const LoginScreen()),
@@ -128,23 +150,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   IconData _mealIcon(String mealName) {
     final key = mealName.toLowerCase();
-
     if (key.contains("breakfast")) return Icons.free_breakfast_rounded;
     if (key.contains("lunch")) return Icons.lunch_dining_rounded;
     if (key.contains("dinner")) return Icons.dinner_dining_rounded;
     if (key.contains("snack")) return Icons.cookie_rounded;
-
     return Icons.restaurant_rounded;
   }
 
   Color _mealColor(String mealName) {
     final key = mealName.toLowerCase();
-
     if (key.contains("breakfast")) return const Color(0xFFF6B7C3);
     if (key.contains("lunch")) return const Color(0xFFFFD59E);
     if (key.contains("dinner")) return const Color(0xFFAEDDC8);
     if (key.contains("snack")) return const Color(0xFFC9C4F7);
-
     return const Color(0xFFE7D9CC);
   }
 
@@ -155,7 +173,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }).join(" ");
   }
 
-  List<FoodItem> _convertMealItems(List<dynamic> items) {
+  List<FoodItem> _convertMealItems(List<MealItem> items) {
     return items.map((item) {
       return FoodItem(
         name: item.name,
@@ -168,78 +186,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }).toList();
   }
 
-  List<Map<String, dynamic>> _defaultMeals() {
-    return [
-      {
-        "title": "Breakfast",
-        "foods": const [
-          FoodItem(
-            name: "Oats with Milk",
-            calories: 320,
-            protein: 12,
-            carbs: 45,
-            fat: 9,
-            serving: "1 bowl",
-          ),
-          FoodItem(
-            name: "Banana",
-            calories: 105,
-            protein: 1.3,
-            carbs: 27,
-            fat: 0.3,
-            serving: "1 medium",
-          ),
-        ],
-      },
-      {
-        "title": "Lunch",
-        "foods": const [
-          FoodItem(
-            name: "Brown Rice",
-            calories: 220,
-            protein: 5,
-            carbs: 46,
-            fat: 1.8,
-            serving: "1 cup",
-          ),
-          FoodItem(
-            name: "Dal",
-            calories: 190,
-            protein: 11,
-            carbs: 21,
-            fat: 7,
-            serving: "1 bowl",
-          ),
-        ],
-      },
-      {
-        "title": "Dinner",
-        "foods": const [
-          FoodItem(
-            name: "Chapati",
-            calories: 140,
-            protein: 4,
-            carbs: 24,
-            fat: 3,
-            serving: "2 pieces",
-          ),
-          FoodItem(
-            name: "Vegetable Curry",
-            calories: 180,
-            protein: 5,
-            carbs: 25,
-            fat: 6,
-            serving: "1 bowl",
-          ),
-        ],
-      },
-    ];
-  }
-
   List<Map<String, dynamic>> _mealsForUi() {
-    if (mealPlan == null) {
-      return _defaultMeals();
-    }
+    if (mealPlan == null) return [];
 
     return mealPlan!.meals.entries.map((entry) {
       return {
@@ -262,7 +210,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     try {
       final profileData = await ApiService.getProfile(user.uid);
       if (!mounted) return;
-      Navigator.pop(context); // close dialog
+      Navigator.pop(context);
 
       Navigator.push(
         context,
@@ -287,7 +235,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      Navigator.pop(context); // close dialog
+      Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Could not load profile: $e")),
       );
@@ -304,24 +252,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
         .expand((foods) => foods)
         .toList();
 
-    final calories = mealPlan?.totalCalories.toInt() ??
-        allFoods.fold<int>(0, (sum, food) => sum + food.calories);
+    final calories = mealPlan?.totalCalories.toInt() ?? 
+        (allFoods.isEmpty ? 0 : allFoods.fold<int>(0, (sum, food) => sum + food.calories));
 
     final protein = mealPlan?.proteinG.toDouble() ??
-        allFoods.fold<double>(0, (sum, food) => sum + food.protein);
+        (allFoods.isEmpty ? 0 : allFoods.fold<double>(0, (sum, food) => sum + food.protein));
 
     final carbs = mealPlan?.carbsG.toDouble() ??
-        allFoods.fold<double>(0, (sum, food) => sum + food.carbs);
+        (allFoods.isEmpty ? 0 : allFoods.fold<double>(0, (sum, food) => sum + food.carbs));
 
     final fats = mealPlan?.fatsG.toDouble() ??
-        allFoods.fold<double>(0, (sum, food) => sum + food.fat);
+        (allFoods.isEmpty ? 0 : allFoods.fold<double>(0, (sum, food) => sum + food.fat));
 
-    // Calculate BMI if height and weight are available
     double? bmi;
     String? bmiStatus;
-    if (widget.heightCm != null && widget.weightKg != null) {
-      final hM = widget.heightCm! / 100.0;
-      bmi = widget.weightKg! / (hM * hM);
+    if (currentHeight != null && currentWeight != null) {
+      final hM = currentHeight! / 100.0;
+      bmi = currentWeight! / (hM * hM);
       bmiStatus = BmiSummaryCard.labelFor(bmi);
     }
 
@@ -333,10 +280,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ? const SizedBox(
                 width: 20,
                 height: 20,
-                child: CircularProgressIndicator(
-                  color: Colors.white,
-                  strokeWidth: 2,
-                ),
+                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
               )
             : const Icon(Icons.auto_awesome_rounded, color: Colors.white),
         label: const Text(
@@ -369,74 +313,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  mealPlan == null
-                      ? "Default plan"
-                      : "Day ${mealPlan!.dayNumber}",
-                  style: const TextStyle(
-                    fontSize: 18,
-                    color: Colors.black54,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  mealPlan == null ? "Default plan" : "Day ${mealPlan!.dayNumber}",
+                  style: const TextStyle(fontSize: 18, color: Colors.black54, fontWeight: FontWeight.w500),
                 ),
                 const SizedBox(height: 14),
                 if (isLoadingMeal)
-                  const LinearProgressIndicator(
-                    minHeight: 5,
-                    color: Color(0xFFF29D72),
-                  ),
-                if (mealError != null) ...[
-                  const SizedBox(height: 10),
-                  Text(
-                    mealError!,
-                    style: const TextStyle(
-                      color: Colors.black54,
-                      fontSize: 13,
-                    ),
-                  ),
-                ],
+                  const LinearProgressIndicator(minHeight: 5, color: Color(0xFFF29D72)),
                 const SizedBox(height: 16),
                 if (bmi != null && bmiStatus != null) ...[
-                  BmiSummaryCard(
-                    bmi: bmi,
-                    status: bmiStatus,
-                    compact: true,
-                  ),
+                  BmiSummaryCard(bmi: bmi, status: bmiStatus, compact: true),
                   const SizedBox(height: 16),
                 ],
-                _MacroCard(
-                  calories: calories,
-                  protein: protein,
-                  carbs: carbs,
-                  fats: fats,
-                ),
+                _MacroCard(calories: calories, protein: protein, carbs: carbs, fats: fats),
                 const SizedBox(height: 18),
                 Expanded(
-                  child: ListView.separated(
-                    itemCount: meals.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 14),
-                    itemBuilder: (context, index) {
-                      final meal = meals[index];
-                      final title = meal["title"] as String;
-                      final foods = meal["foods"] as List<FoodItem>;
+                  child: meals.isEmpty && !isLoadingMeal
+                      ? const Center(child: Text("Click 'Generate AI Meal' to start!"))
+                      : ListView.separated(
+                          itemCount: meals.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 14),
+                          itemBuilder: (context, index) {
+                            final meal = meals[index];
+                            final title = meal["title"] as String;
+                            final foods = meal["foods"] as List<FoodItem>;
 
-                      return _MealCard(
-                        title: title,
-                        icon: _mealIcon(title),
-                        bgColor: _mealColor(title),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => MealDetailScreen(
-                                mealName: title,
-                                foods: foods,
-                              ),
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  ),
+                            return _MealCard(
+                              title: title,
+                              icon: _mealIcon(title),
+                              bgColor: _mealColor(title),
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => MealDetailScreen(mealName: title, foods: foods),
+                                  ),
+                                );
+                              },
+                            );
+                          },
+                        ),
                 ),
               ],
             ),
@@ -453,12 +368,7 @@ class _TopBar extends StatelessWidget {
   final VoidCallback onLogout;
   final VoidCallback onProfileTap;
 
-  const _TopBar({
-    required this.name,
-    required this.email,
-    required this.onLogout,
-    required this.onProfileTap,
-  });
+  const _TopBar({required this.name, required this.email, required this.onLogout, required this.onProfileTap});
 
   @override
   Widget build(BuildContext context) {
@@ -468,10 +378,7 @@ class _TopBar extends StatelessWidget {
           onTap: onProfileTap,
           child: const CircleAvatar(
             backgroundColor: Color(0xFFFFE9DA),
-            child: Icon(
-              Icons.person_rounded,
-              color: Color(0xFFF29D72),
-            ),
+            child: Icon(Icons.person_rounded, color: Color(0xFFF29D72)),
           ),
         ),
         const SizedBox(width: 10),
@@ -479,29 +386,12 @@ class _TopBar extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                "Hello, $name",
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              Text(
-                email,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: Colors.black54,
-                ),
-              ),
+              Text(name, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              Text(email, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: Colors.black54)),
             ],
           ),
         ),
-        IconButton(
-          onPressed: onLogout,
-          icon: const Icon(Icons.logout_rounded),
-        ),
+        IconButton(onPressed: onLogout, icon: const Icon(Icons.logout_rounded)),
       ],
     );
   }
@@ -513,33 +403,21 @@ class _MacroCard extends StatelessWidget {
   final double carbs;
   final double fats;
 
-  const _MacroCard({
-    required this.calories,
-    required this.protein,
-    required this.carbs,
-    required this.fats,
-  });
+  const _MacroCard({required this.calories, required this.protein, required this.carbs, required this.fats});
 
   @override
   Widget build(BuildContext context) {
     final total = protein + carbs + fats;
-
-    final proteinPercent = total == 0 ? 0.0 : protein / total;
-    final carbsPercent = total == 0 ? 0.0 : carbs / total;
-    final fatsPercent = total == 0 ? 0.0 : fats / total;
+    final pP = total == 0 ? 0.0 : protein / total;
+    final cP = total == 0 ? 0.0 : carbs / total;
+    final fP = total == 0 ? 0.0 : fats / total;
 
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: const Color(0xFFFDF8F4),
         borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 14,
-            offset: const Offset(0, 7),
-          ),
-        ],
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 14, offset: const Offset(0, 7))],
       ),
       child: Row(
         children: [
@@ -548,30 +426,13 @@ class _MacroCard extends StatelessWidget {
             child: SizedBox(
               height: 150,
               child: CustomPaint(
-                painter: MacroRingPainter(
-                  proteinPercent,
-                  carbsPercent,
-                  fatsPercent,
-                ),
+                painter: MacroRingPainter(pP, cP, fP),
                 child: Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        "$calories",
-                        style: const TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF262626),
-                        ),
-                      ),
-                      const Text(
-                        "kcal",
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.black54,
-                        ),
-                      ),
+                      Text("$calories", style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Color(0xFF262626))),
+                      const Text("kcal", style: TextStyle(fontSize: 13, color: Colors.black54)),
                     ],
                   ),
                 ),
@@ -583,23 +444,11 @@ class _MacroCard extends StatelessWidget {
             flex: 4,
             child: Column(
               children: [
-                _LegendItem(
-                  color: const Color(0xFFFFC98B),
-                  title: "Protein",
-                  value: "${protein.toStringAsFixed(0)}g",
-                ),
+                _LegendItem(color: const Color(0xFFFFC98B), title: "Protein", value: "${protein.toStringAsFixed(0)}g"),
                 const SizedBox(height: 14),
-                _LegendItem(
-                  color: const Color(0xFFC8C4F8),
-                  title: "Carbs",
-                  value: "${carbs.toStringAsFixed(0)}g",
-                ),
+                _LegendItem(color: const Color(0xFFC8C4F8), title: "Carbs", value: "${carbs.toStringAsFixed(0)}g"),
                 const SizedBox(height: 14),
-                _LegendItem(
-                  color: const Color(0xFFF6B7C3),
-                  title: "Fats",
-                  value: "${fats.toStringAsFixed(0)}g",
-                ),
+                _LegendItem(color: const Color(0xFFF6B7C3), title: "Fats", value: "${fats.toStringAsFixed(0)}g"),
               ],
             ),
           ),
@@ -613,42 +462,16 @@ class _LegendItem extends StatelessWidget {
   final Color color;
   final String title;
   final String value;
-
-  const _LegendItem({
-    required this.color,
-    required this.title,
-    required this.value,
-  });
+  const _LegendItem({required this.color, required this.title, required this.value});
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Container(
-          width: 11,
-          height: 11,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
-        ),
+        Container(width: 11, height: 11, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
         const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            title,
-            style: const TextStyle(
-              fontSize: 15,
-              color: Colors.black54,
-            ),
-          ),
-        ),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+        Expanded(child: Text(title, style: const TextStyle(fontSize: 15, color: Colors.black54))),
+        Text(value, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
       ],
     );
   }
@@ -659,13 +482,7 @@ class _MealCard extends StatelessWidget {
   final IconData icon;
   final Color bgColor;
   final VoidCallback onTap;
-
-  const _MealCard({
-    required this.title,
-    required this.icon,
-    required this.bgColor,
-    required this.onTap,
-  });
+  const _MealCard({required this.title, required this.icon, required this.bgColor, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -679,44 +496,18 @@ class _MealCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: const Color(0xFFFDF8F4),
             borderRadius: BorderRadius.circular(26),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 14,
-                offset: const Offset(0, 7),
-              ),
-            ],
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 14, offset: const Offset(0, 7))],
           ),
           child: Row(
             children: [
               Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: bgColor,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Icon(
-                  icon,
-                  color: const Color(0xFF5B4B45),
-                  size: 30,
-                ),
+                width: 64, height: 64,
+                decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(20)),
+                child: Icon(icon, color: const Color(0xFF5B4B45), size: 30),
               ),
               const SizedBox(width: 16),
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              const Icon(
-                Icons.arrow_forward_ios_rounded,
-                size: 18,
-                color: Colors.black38,
-              ),
+              Expanded(child: Text(title, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600))),
+              const Icon(Icons.arrow_forward_ios_rounded, size: 18, color: Colors.black38),
             ],
           ),
         ),
@@ -726,63 +517,25 @@ class _MealCard extends StatelessWidget {
 }
 
 class MacroRingPainter extends CustomPainter {
-  final double protein;
-  final double carbs;
-  final double fats;
-
-  MacroRingPainter(
-    this.protein,
-    this.carbs,
-    this.fats,
-  );
+  final double p; final double c; final double f;
+  MacroRingPainter(this.p, this.c, this.f);
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    const strokeWidth = 14.0;
     final radius = (size.shortestSide / 2) - 12;
-
-    final basePaint = Paint()
-      ..color = const Color(0xFFEFEAE5)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round;
-
+    final basePaint = Paint()..color = const Color(0xFFEFEAE5)..style = PaintingStyle.stroke..strokeWidth = 14..strokeCap = StrokeCap.round;
     canvas.drawCircle(center, radius, basePaint);
-
     double start = -1.5708;
-
-    void drawArc(double percent, Color color) {
+    void draw(double percent, Color col) {
       if (percent <= 0) return;
-
-      final paint = Paint()
-        ..color = color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = strokeWidth
-        ..strokeCap = StrokeCap.round;
-
+      final paint = Paint()..color = col..style = PaintingStyle.stroke..strokeWidth = 14..strokeCap = StrokeCap.round;
       final sweep = 6.28318 * percent;
-
-      canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius),
-        start,
-        sweep,
-        false,
-        paint,
-      );
-
+      canvas.drawArc(Rect.fromCircle(center: center, radius: radius), start, sweep, false, paint);
       start += sweep;
     }
-
-    drawArc(protein, const Color(0xFFFFC98B));
-    drawArc(carbs, const Color(0xFFC8C4F8));
-    drawArc(fats, const Color(0xFFF6B7C3));
+    draw(p, const Color(0xFFFFC98B)); draw(c, const Color(0xFFC8C4F8)); draw(f, const Color(0xFFF6B7C3));
   }
-
   @override
-  bool shouldRepaint(covariant MacroRingPainter oldDelegate) {
-    return oldDelegate.protein != protein ||
-        oldDelegate.carbs != carbs ||
-        oldDelegate.fats != fats;
-  }
+  bool shouldRepaint(covariant MacroRingPainter old) => true;
 }
